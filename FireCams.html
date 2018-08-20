@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<!--
+ALERTTahoe
+Nevada Seismological Laboratory (2014)
+
+{"TOKEN": "3d9b69473d3b4520b9c81ed029ba65f9"}
+-->
+<style>
+@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro');
+@import url('https://fonts.googleapis.com/css?family=Source+Code+Pro');
+* {
+    box-sizing: border-box;
+    font-family: 'Source Sans Pro', sans-serif;
+}
+h2, p {
+	padding: 0px;
+	margin: 0px;
+    display: inline;
+}
+mark{
+    font-family: Source Code Pro;
+    color:white;
+    background-color:red;
+    font-weight: bold;
+}
+table{
+    border-collapse: collapse;
+    border: 0px;
+    table-layout: fixed;
+    width: 100%;
+    text-align: left;
+} 
+tr,td {
+    border: 0px;
+    padding-top: 0px;
+    valign: top;
+}
+#weatherTable{
+    white-space: nowrap;
+    display: block;
+    padding: 0px
+    table-layout: auto;
+    border-collapse: collapse;
+    width: auto;
+    text-align: left;
+}
+#weatherTable td, #weatherTable tr, #weatherTable th{
+    border-collapse: collapse;
+    border: 1px solid black;
+    table-layout: fixed;
+    background-color: #f5f5f5;
+}
+#NWS{
+    width: 100%;
+    height: 500px;
+    background-color: #f5f5f5;
+    white-space: pre;
+    font-family: Source Code Pro;
+    font-size: 75%;
+    overflow: auto;
+}
+.cameraView{
+    width: 100%;
+}
+#mapDiv{
+    width: 100%;
+    height: 500px
+    max-height: 500px;
+    min-height: 500px;
+}
+#map{
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.compass{
+    position: absolute;
+    top: -50px;
+    right: 50%;
+    max-width: 200px;
+    width: 200px;
+    height: 200px;
+    transform: rotateX(0deg) rotateZ(-298deg) translateY(-50%);
+}
+/* img fullscreen */
+.viewContainer {
+    position: relative;
+}
+.viewContainer img {
+    width: 100%;
+}
+.viewContainer .ui-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+}
+#map .ui-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 1000;
+}
+/* Date slider */
+#day-label {
+    left: 1em;
+    bottom: 1em;
+    color: rgb(40, 40, 40);
+    width: 100%;
+    text-align: center;
+    padding-bottom: 0.5em;
+}
+#day-panel {
+    visibility: hidden;
+    position: absolute;
+    left: 1em;
+    bottom: 1em;
+    padding: 1em;
+    background-color: rgba(256, 256, 256, 0.8);
+    border-radius: 5px;
+    border: 1px solid rgb(40, 40, 40);
+    z-index: 1000;
+}
+#day-panel div {
+    width: 10em;
+}
+/* Tooltip container */
+.tooltip {
+    position: relative;
+    display: inline;
+    border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+}
+/* Tooltip text */
+.tooltip .tooltiptext {
+    white-space: normal;
+    display: block;
+    visibility: hidden;
+    width: 400px;
+    max-width:400px;
+    min-width:400px;
+    word-wrap: break-word;
+    background-color: black;
+    color: #fff;
+    text-align: left;
+    padding: 5px 5px;
+    border-radius: 6px;
+ 
+    /* Position the tooltip text - see examples below! */
+    position: absolute;
+    z-index: 1;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+}
+</style>
+<head>
+<title>Fire Dashboard</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<!--<meta http-equiv="refresh" content="60" />  Page refresh --> 
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"></link>
+<script
+    src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
+    integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
+    crossorigin="anonymous"></script>
+<!-- Load Leaflet from CDN -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.3/dist/leaflet.css"
+integrity="sha512-Rksm5RenBEKSKFjgI3a41vrjkw4EVPlJ3+OiI65vTjIdo9brlAacEuKOiQ5OFh7cOI1bkDwLqdLw3Zg0cRJAAQ=="
+crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.3.3/dist/leaflet.js"
+integrity="sha512-tAGcCfR4Sc5ZP5ZoVz0quoZDYX5aCtEm/eu1KhSLj2c9eFrylXZknQYmxUssFaVJKvvc0dJQixhGjG2yXWiV9Q=="
+crossorigin=""></script>
+<!-- Load Esri Leaflet from CDN -->
+<script src="https://unpkg.com/esri-leaflet@2.2.2/dist/esri-leaflet.js"
+integrity="sha512-cll/dcqNKG7yfQBrTbRNzGQ70Bh4m+J5jnvU97tPyMnWsD1Ry+CXi0JE+T7Rk54pdJEYlRgXtpwxa9sUqzUAyg=="
+crossorigin=""></script>
+<!-- Load Leaflet AJAX from CDN -->
+<script src="./lib/leaflet.rotatedMarker.js"></script>
+<script src="FireDash.js"></script>
+
+</head>
+
+<body>
+<p style="margin-top: -1em;"></p>
+<table>
+    <tr>
+        <td>
+            <div class='viewContainer'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera0" class='cameraView' title='Select cameras from the map'>
+                <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+                <!--<img src='https://upload.wikimedia.org/wikipedia/commons/8/8d/Simple_compass_rose.svg' class='compass'> -->
+            </div>
+        </td>
+        <td>
+            <div class='viewContainer'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera1" class='cameraView' title='Select cameras from the map'>
+                <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class='viewContainer'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera2" class='cameraView' title='Select cameras from the map'>
+                <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+            </div>
+        </td>
+        <td>
+            <table style="border:0px;table-layout:auto;">
+                <tr>
+                    <td id='weather' valign='top'>
+                        <b>MesoWest Current Conditions</b>
+                        <script src="weather.js"></script>
+                    </td>
+                    <td>
+                        <div id="NWS"></div>
+                        <script>
+                        // get the fire weather URL
+                        $.get("https://api.weather.gov/products/types/FWF/locations/STO",
+                            function(stationData) {
+                                var productURL = stationData["@graph"][0]["@id"];
+                                // get the fire weather forecast and parse to fire zone (CAZ269)
+                                $.get(productURL,
+                                    function(NWSdata) {
+                                        var NWSText = NWSdata.productText;
+                                        // find the start of zone 269 (changes sometimes - don't ask me why)
+                                        var beginText = (NWSText.indexOf("CAZ269") != -1 ? NWSText.indexOf("CAZ269") : NWSText.indexOf("CAZ221-269"))
+                                        var FWF = NWSText.slice(beginText,
+                                                                NWSText.indexOf("$$", beginText));
+                                        var extended = NWSText.slice(NWSText.lastIndexOf("Northern Sierra and Lassen Park"),
+                                                                     NWSText.lastIndexOf("Central Valley and Delta"));
+                                        var forecast = FWF + "EXTENDED\n" + extended;
+                                        $('#NWS').html(forecast.replace(/\n/g, "<br />"));
+                                        getAlerts();
+                                    }
+                                );
+                            }
+                        );
+                        function getAlerts() {
+                            $.get("https://api.weather.gov/alerts/active/zone/CAZ269",
+                            function(alertData) {
+                                var weatherHeader = ''
+                                if (alertData.features.length > 0) {
+                                    for (i=0; i < alertData.features.length; i++) {
+                                        weatherHeader += '<div class="tooltip"><mark>' + alertData.features[i].properties.event + '</mark><span class="tooltiptext">'+
+                                            alertData.features[i].properties.headline + '<br><br>' +
+                                            alertData.features[i].properties.description + '</span></div><br>';
+                                    }
+                                    $('#NWS').html(function(index, currentContent) {
+                                            return weatherHeader.replace(/\n/g, "<br />") + currentContent
+                                    })
+                                }
+                            })
+                        };
+                        </script>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <a href="http://www.alertwildfire.org/tahoe/firecams.html" target="_blank" style="font-size:10px;">UNR Fire Cameras Website</a>
+                    </td>
+                    <td>
+                        <a href="https://www.wrh.noaa.gov/fire2/?wfo=sto" target="_blank" style="font-size:10px;">NWS Fire Wx Planning Map</a>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+<div id='mapDiv' style='height:100px;'>
+    <div id='map'>
+        <button id='refresh' class="ui-button ui-widget ui-corner-all" style='width:20px;height:20px;padding:0;' title='Fullscreen'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+        <div id="day-panel">
+                <div id="day-label"></div>
+                <div id="day-slider" style="width:150px;"></div>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+setInterval(refreshCam, 10 * 1000);
+setInterval(check_times, 60 * 1000);
+// Reloads the page every 6 hours to refresh the forecast 
+setTimeout(function(){window.location.reload(1)}, 6 * 3600 * 1000); 
+</script>
+</html>
