@@ -245,7 +245,6 @@ $(function() {
     })
     .then(function([GeoJSON_cam, GeoJSON_view]) {
         camGeoJSON = GeoJSON_cam; // moidfy the global
-        console.log(typeof camGeoJSON.features[0].properties.az_current);
         viewGeoJSON = GeoJSON_view; // modify the global
         FireViews = L.geoJSON(GeoJSON_view, {
             id: 'FireViews',
@@ -270,8 +269,8 @@ $(function() {
                         iconSize: 15
                     }),
                     rotationAngle: parseFloat(feature.properties.az_current),
-                    rotationOrigin: 'center'
-                    title: 
+                    rotationOrigin: 'center',
+                    title: feature.properties.id
                     //radius: 5,
                     //fillColor: "#ff7800",
                     //color: "#000",
