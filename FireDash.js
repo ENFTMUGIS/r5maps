@@ -4,7 +4,8 @@ String.prototype.format = function () {
     return typeof args[i] != 'undefined' ? args[i++] : '';
   });
 };
-var SelectedCams = getFireDashCookie(),
+var map,
+    SelectedCams = getFireDashCookie(),
     generator = CameraGenerator(),
     USGSTopo_url = 'http://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
     WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
@@ -32,6 +33,7 @@ function refreshCam(){
             element.src = FireCamImage.format(id) + '?' + new Date().getTime();
         }
     }
+    $(loadGeoJSON());
 };
 function check_times() {
     var date_time_array = [dat1.air_temp_value_1.date_time, dat2.air_temp_value_1.date_time];
@@ -141,7 +143,7 @@ $(function() {
     });
 });
 // Map
-$(function() {      
+$(function() {
     refreshCam(); // refresh off the start for any cookies
     
     var USGSTopo = L.esri.tiledMapLayer({
@@ -209,7 +211,7 @@ $(function() {
         zIndex: 6
     });
     // Leaflet initialize map
-    var map = L.map('map', {
+    map = L.map('map', {
         center: [38.85, -120.45,],
         zoom: 9,
         crs: L.CRS.EPSG3857,
@@ -220,99 +222,6 @@ $(function() {
         fadeAnimation: false,
         layers: [USGSTopo, WorldImage, FSAdmin, FSTopo, GeoMac],
     });
-    // Get the Fire Cams
-    var FireCams, FireViews, camGeoJSON, viewGeoJSON;    
-    $.getJSON(FireCam_url)
-    .then(function(GeoJSON) {
-        var GeoJSON_cam = $.extend(true, {}, GeoJSON)
-        var GeoJSON_view = GeoJSON.features.map(function(feature, i){
-                if (!feature.properties.hasOwnProperty('fov_rt')){
-                    return
-                }
-                var coords = [[
-                    [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
-                    [parseFloat(feature.properties.fov_rt[0]), parseFloat(feature.properties.fov_rt[1])],
-                    [parseFloat(feature.properties.fov_lft[0]), parseFloat(feature.properties.fov_lft[1])],
-                    [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
-                ]];
-                feature.geometry = {
-                    'type': 'Polygon',
-                    'coordinates': coords
-                };
-            return feature
-        });
-        return [GeoJSON_cam, {type:'FeatureCollection', features:GeoJSON_view.filter(Boolean)}]
-    })
-    .then(function([GeoJSON_cam, GeoJSON_view]) {
-        camGeoJSON = GeoJSON_cam; // moidfy the global
-        viewGeoJSON = GeoJSON_view; // modify the global
-        FireViews = L.geoJSON(GeoJSON_view, {
-            id: 'FireViews',
-            style:  {
-                weight: 2,
-                color: '#bac3cb',
-                opacity: 1,
-                fillColor: "#778899",
-                fillOpacity: 0.3
-            },
-            zIndex: 5,
-            filter: function(feature, layer){
-                return SelectedCams.includes(feature.properties.id)
-            }
-        }).addTo(map);
-        FireCams = L.geoJSON(GeoJSON_cam, {
-            id: 'FireCams',
-            pointToLayer: function (feature, latlng) {
-                return L.marker(latlng, {
-                    icon: new L.Icon({
-                        iconUrl: './lib/if_arrow-circle-up_1608521.svg',
-                        iconSize: 15
-                    }),
-                    rotationAngle: parseFloat(feature.properties.az_current),
-                    rotationOrigin: 'center',
-                    title: feature.properties.id
-                    //radius: 5,
-                    //fillColor: "#ff7800",
-                    //color: "#000",
-                    //weight: 1,
-                    //opacity: 1,
-                    //fillOpacity: 0.8
-                });
-            },
-            zIndex: 6
-        }).addTo(map);
-        FireCams.on('click', function(f){
-            var id = f.layer.feature.properties.id;
-            map.removeLayer(FireViews);
-            if (SelectedCams.includes(id)) {
-                SelectedCams.splice(SelectedCams.indexOf(id), 1);
-            } else {
-                SelectedCams.push(id);
-            }
-            reloadCamViews();
-            console.log(JSON.stringify(SelectedCams));
-            document.cookie = 'FireDash='+SelectedCams.join('|');
-            setCameraDiv(id);
-        });
-    });
-    function reloadCamViews(){
-        FireViews = L.geoJSON(viewGeoJSON, {
-            id: 'FireViews',
-            style:  {
-                weight: 2,
-                color: '#bac3cb',
-                opacity: 1,
-                fillColor: "#778899",
-                fillOpacity: 0.3
-            },
-            zIndex: 4,
-            filter: function(feature, layer){
-                return SelectedCams.includes(feature.properties.id)
-            }
-        }).addTo(map);
-        map.removeLayer(FireCams);
-        map.addLayer(FireCams);
-    };
     // Layer controls
     var basemaps = {
         'USGS Topo': USGSTopo,
@@ -419,3 +328,97 @@ $(function() {
         }
     });
 });
+
+// Get the Fire Cams
+var FireCams, FireViews, camGeoJSON, viewGeoJSON;
+function loadGeoJSON(){
+    $.getJSON(FireCam_url)
+    .then(function(GeoJSON) {
+        var GeoJSON_view = $.extend(true, {}, GeoJSON)
+        GeoJSON_view.features.map(function(feature, i){
+                if (!feature.properties.hasOwnProperty('fov_rt')){
+                    return
+                }
+                var coords = [[
+                    [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
+                    [parseFloat(feature.properties.fov_rt[0]), parseFloat(feature.properties.fov_rt[1])],
+                    [parseFloat(feature.properties.fov_lft[0]), parseFloat(feature.properties.fov_lft[1])],
+                    [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
+                ]];
+                feature.geometry = {
+                    'type': 'Polygon',
+                    'coordinates': coords
+                };
+            return feature
+        });
+        return [GeoJSON, GeoJSON_view]
+    })
+    .then(function([GeoJSON_cam, GeoJSON_view]) {
+        camGeoJSON = GeoJSON_cam; // moidfy the global
+        viewGeoJSON = GeoJSON_view; // modify the global
+        if (FireViews) {map.removeLayer(FireViews)};
+        FireViews = L.geoJSON(GeoJSON_view, {
+            id: 'FireViews',
+            style:  {
+                weight: 2,
+                color: '#bac3cb',
+                opacity: 1,
+                fillColor: "#778899",
+                fillOpacity: 0.3
+            },
+            zIndex: 5,
+            filter: function(feature, layer){
+                return SelectedCams.includes(feature.properties.id)
+            }
+        }).addTo(map);
+        if (FireCams) {map.removeLayer(FireCams)}
+        FireCams = L.geoJSON(GeoJSON_cam, {
+            id: 'FireCams',
+            pointToLayer: function (feature, latlng) {
+                return L.marker(latlng, {
+                    icon: new L.Icon({
+                        iconUrl: './lib/if_arrow-circle-up_1608521.svg',
+                        iconSize: 15
+                    }),
+                    rotationAngle: parseFloat(feature.properties.az_current),
+                    rotationOrigin: 'center',
+                    title: feature.properties.id
+                });
+            },
+            zIndex: 6
+        }).addTo(map);
+        FireCams.on('click', function(f){
+            var id = f.layer.feature.properties.id;
+            map.removeLayer(FireViews);
+            if (SelectedCams.includes(id)) {
+                SelectedCams.splice(SelectedCams.indexOf(id), 1);
+            } else {
+                SelectedCams.push(id);
+            }
+            reloadCamViews();
+            console.log(JSON.stringify(SelectedCams));
+            document.cookie = 'FireDash='+SelectedCams.join('|');
+            setCameraDiv(id);
+        });
+    });
+    function reloadCamViews(){
+        FireViews = L.geoJSON(viewGeoJSON, {
+            id: 'FireViews',
+            style:  {
+                weight: 2,
+                color: '#bac3cb',
+                opacity: 1,
+                fillColor: "#778899",
+                fillOpacity: 0.3
+            },
+            zIndex: 4,
+            filter: function(feature, layer){
+                return SelectedCams.includes(feature.properties.id)
+            }
+        });
+        map.addLayer(FireViews);
+        console.log(FireViews);
+        map.removeLayer(FireCams);
+        map.addLayer(FireCams);
+    };
+}   
