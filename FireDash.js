@@ -7,7 +7,7 @@ String.prototype.format = function () {
 var map,
     SelectedCams = getFireDashCookie(),
     generator = CameraGenerator(),
-    USGSTopo_url = 'http://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
+    USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
     WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
     FSTopo_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_FSTopo_01/MapServer',
     FSAdmin_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer',
