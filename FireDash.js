@@ -19,6 +19,7 @@ var map,
     Smoke_url = 'https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/ndgd_smoke_sfc_1hr_avg_time/ImageServer/WMSServer?',
     NasaGibs_url = 'https://gibs-{s}.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg',
     FireCam_url = 'http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1',
+    FireCam_url_bitly = 'https://bit.ly/2MzakjG',
     FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image";
     
 function refreshCam(){
@@ -332,7 +333,7 @@ $(function() {
 // Get the Fire Cams
 var FireCams, FireViews, camGeoJSON, viewGeoJSON;
 function loadGeoJSON(){
-    $.getJSON(FireCam_url)
+    $.getJSON(FireCam_url_bitly)
     .then(function(GeoJSON) {
         var GeoJSON_view = $.extend(true, {}, GeoJSON)
         GeoJSON_view.features.map(function(feature, i){
