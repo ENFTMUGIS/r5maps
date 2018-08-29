@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<style>
+html, body, #map {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+}
+#day-label {
+    left: 1em;
+    bottom: 1em;
+    color: rgb(40, 40, 40);
+    width: 100%;
+    text-align: center;
+    padding-bottom: 0.5em;
+}
+#day-panel {
+    position: absolute;
+    left: 1em;
+    bottom: 1em;
+    padding: 1em;
+    background-color: rgba(256, 256, 256, 0.8);
+    border-radius: 5px;
+    border: 1px solid rgb(40, 40, 40);
+}
+#day-panel div {
+    width: 10em;
+}
+</style>
+<head>
+<title>Fire Map</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script
+    src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
+    integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
+    crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"></link>
+<!-- Reference the JavaScript API from our CDN and you are ready to get started: -->
+<link rel="stylesheet" href="https://js.arcgis.com/4.8/esri/css/main.css">
+<script src="https://js.arcgis.com/4.8/"></script>
+<script src="FireMapOnly.js"></script>
+</head>
+
+<body>
+<div id="map"></div>
+<div id="day-panel">
+        <div id="day-label"></div>
+        <div id="day-slider" style="width:150px;"></div>
+</div>
+<div id="legend"></div>
+</body>
+</html>
+
