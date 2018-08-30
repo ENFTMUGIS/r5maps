@@ -48,7 +48,7 @@ var mywidget = {
 
           at the end, we define the funciton "receive" to get called once the data are loaded.
         */
-        $.getJSON('http://api.mesowest.net/v2/stations/latest?callback=?',
+        $.getJSON('https://api.mesowest.net/v2/stations/latest?callback=?',
         {
             // specify the request parameters here
             stid:stn,
