@@ -6,6 +6,7 @@ String.prototype.format = function () {
 };
 var map,
     SelectedCams = getFireDashCookie(),
+    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill']
     generator = CameraGenerator(),
     USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
     WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
