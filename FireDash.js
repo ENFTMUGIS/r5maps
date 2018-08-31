@@ -349,7 +349,6 @@ function loadGeoJSON(){
         }
     })
     .then(function(GeoJSON) {
-        console.log(GeoJSON);
         var GeoJSON_view = $.extend(true, {}, GeoJSON)
         GeoJSON_view.features.map(function(feature, i){
                 if (!feature.properties.description.hasOwnProperty('fov_rt')){
