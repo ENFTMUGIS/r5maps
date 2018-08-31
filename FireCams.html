@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html>
-<!--
-ALERTTahoe
-Nevada Seismological Laboratory (2014)
 
-{"TOKEN": "3d9b69473d3b4520b9c81ed029ba65f9"}
--->
 <style>
 @import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro');
 @import url('https://fonts.googleapis.com/css?family=Source+Code+Pro');
@@ -76,16 +71,17 @@ tr,td {
 }
 .compass{
     position: absolute;
-    top: -50px;
+    top: -50%;
     right: 50%;
-    max-width: 200px;
-    width: 200px;
-    height: 200px;
-    transform: rotateX(0deg) rotateZ(-298deg) translateY(-50%);
+    max-width: 800px;
+    width: 800px;
+    height: 800px;
+    transform: rotateX(60deg) rotateZ(-200deg) translate(-50%, -50%);
 }
 /* img fullscreen */
 .viewContainer {
     position: relative;
+    /*overflow: hidden;*/
 }
 .viewContainer img {
     width: 100%;
@@ -132,6 +128,7 @@ tr,td {
 }
 /* Tooltip text */
 .tooltip .tooltiptext {
+    font-size: 75%;
     white-space: normal;
     display: block;
     visibility: hidden;
@@ -145,7 +142,7 @@ tr,td {
     padding: 5px 5px;
     border-radius: 6px;
  
-    /* Position the tooltip text - see examples below! */
+    /* Position the tooltip text */
     position: absolute;
     z-index: 1;
 }
@@ -187,15 +184,19 @@ crossorigin=""></script>
 <table>
     <tr>
         <td>
-            <div class='viewContainer'>
-                <img src="./lib/alert-tahoe-logo.png" id="camera0" class='cameraView' title='Select cameras from the map'>
-                <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
-                <!--<img src='https://upload.wikimedia.org/wikipedia/commons/8/8d/Simple_compass_rose.svg' class='compass'> -->
+            <div id='mapDiv' style='height:100px;'>
+                <div id='map'>
+                    <button id='refresh' class="ui-button ui-widget ui-corner-all" style='width:20px;height:20px;padding:0;' title='Fullscreen'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+                    <div id="day-panel">
+                            <div id="day-label"></div>
+                            <div id="day-slider" style="width:150px;"></div>
+                    </div>
+                </div>
             </div>
         </td>
         <td>
             <div class='viewContainer'>
-                <img src="./lib/alert-tahoe-logo.png" id="camera1" class='cameraView' title='Select cameras from the map'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera0" class='cameraView' title='Select cameras from the map'>
                 <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
             </div>
         </td>
@@ -203,86 +204,22 @@ crossorigin=""></script>
     <tr>
         <td>
             <div class='viewContainer'>
-                <img src="./lib/alert-tahoe-logo.png" id="camera2" class='cameraView' title='Select cameras from the map'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera1" class='cameraView' title='Select cameras from the map'>
                 <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
             </div>
         </td>
         <td>
-            <table style="border:0px;table-layout:auto;">
-                <tr>
-                    <td id='weather' valign='top'>
-                        <b>MesoWest Current Conditions</b>
-                        <script src="weather.js"></script>
-                    </td>
-                    <td>
-                        <div id="NWS"></div>
-                        <script>
-                        // get the fire weather URL
-                        $.get("https://api.weather.gov/products/types/FWF/locations/STO",
-                            function(stationData) {
-                                var productURL = stationData["@graph"][0]["@id"];
-                                // get the fire weather forecast and parse to fire zone (CAZ269)
-                                $.get(productURL,
-                                    function(NWSdata) {
-                                        var NWSText = NWSdata.productText;
-                                        // find the start of zone 269 (changes sometimes - don't ask me why)
-                                        var beginText = (NWSText.indexOf("CAZ269") != -1 ? NWSText.indexOf("CAZ269") : NWSText.indexOf("CAZ221-269"))
-                                        var FWF = NWSText.slice(beginText,
-                                                                NWSText.indexOf("$$", beginText));
-                                        var extended = NWSText.slice(NWSText.lastIndexOf("Northern Sierra and Lassen Park"),
-                                                                     NWSText.lastIndexOf("Central Valley and Delta"));
-                                        var forecast = FWF + "EXTENDED\n" + extended;
-                                        $('#NWS').html(forecast.replace(/\n/g, "<br />"));
-                                        getAlerts();
-                                    }
-                                );
-                            }
-                        );
-                        function getAlerts() {
-                            $.get("https://api.weather.gov/alerts/active/zone/CAZ269",
-                            function(alertData) {
-                                var weatherHeader = ''
-                                if (alertData.features.length > 0) {
-                                    for (i=0; i < alertData.features.length; i++) {
-                                        weatherHeader += '<div class="tooltip"><mark>' + alertData.features[i].properties.event + '</mark><span class="tooltiptext">'+
-                                            alertData.features[i].properties.headline + '<br><br>' +
-                                            alertData.features[i].properties.description + '</span></div><br>';
-                                    }
-                                    $('#NWS').html(function(index, currentContent) {
-                                            return weatherHeader.replace(/\n/g, "<br />") + currentContent
-                                    })
-                                }
-                            })
-                        };
-                        </script>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <a href="http://www.alertwildfire.org/tahoe/firecams.html" target="_blank" style="font-size:10px;">UNR Fire Cameras Website</a>
-                    </td>
-                    <td>
-                        <a href="https://www.wrh.noaa.gov/fire2/?wfo=sto" target="_blank" style="font-size:10px;">NWS Fire Wx Planning Map</a>
-                    </td>
-                </tr>
-            </table>
+            <div class='viewContainer'>
+                <img src="./lib/alert-tahoe-logo.png" id="camera2" class='cameraView' title='Select cameras from the map'>
+                <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+                <!--<img src='./lib/compass-rose.png' class='compass'>-->
+            </div>
         </td>
     </tr>
 </table>
-<div id='mapDiv' style='height:100px;'>
-    <div id='map'>
-        <button id='refresh' class="ui-button ui-widget ui-corner-all" style='width:20px;height:20px;padding:0;' title='Fullscreen'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
-        <div id="day-panel">
-                <div id="day-label"></div>
-                <div id="day-slider" style="width:150px;"></div>
-        </div>
-    </div>
-</div>
 </body>
 <script>
+// refresh the cameras every 10 seconds
 setInterval(refreshCam, 10 * 1000);
-setInterval(check_times, 60 * 1000);
-// Reloads the page every 6 hours to refresh the forecast 
-setTimeout(function(){window.location.reload(1)}, 6 * 3600 * 1000); 
 </script>
 </html>
