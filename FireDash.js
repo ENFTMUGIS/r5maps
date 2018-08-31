@@ -19,12 +19,13 @@ var map,
     SurfaceObservation_url = 'https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/obs_meteocean_insitu_sfc_time/MapServer',
     Smoke_url = 'https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/ndgd_smoke_sfc_1hr_avg_time/ImageServer/WMSServer?',
     NasaGibs_url = 'https://gibs-{s}.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg',
-    FireCam_url = 'http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1',
-    FireCam_url_bitly = 'https://bit.ly/2MzakjG',
+    //FireCam_url = 'http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1',
+    FireCam_url = 'https://firemap.sdsc.edu:5443/stations?selection=boundingBox&minLat=32.5121&minLon=-124.6509&maxLat=49&maxLon=-114.1315',
     FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image";
     
 function refreshCam(){
     for (var c=0; c < 3; c++){
+        // get the camera element
         var element = document.getElementById('camera' + c);
         var id  = SelectedCams[generator.next().value];
         if (id == undefined){
@@ -35,6 +36,7 @@ function refreshCam(){
             element.src = FireCamImage.format(id) + '?' + new Date().getTime();
         }
     }
+    // re-load the camera geoJSON
     $(loadGeoJSON());
 };
 function check_times() {
@@ -77,7 +79,7 @@ function setCameraDiv(id){
     var element = document.getElementById('camera' + position);
     element.src = FireCamImage.format(id);
     element.title = id;
-};
+}
 function* CameraGenerator(){
     let group = 0;
     let n = 0; // keeps one camera group for 3 iterations
@@ -334,17 +336,29 @@ $(function() {
 // Get the Fire Cams
 var FireCams, FireViews, camGeoJSON, viewGeoJSON;
 function loadGeoJSON(){
-    $.getJSON(FireCam_url_bitly)
+    $.ajax({
+        url: FireCam_url,
+        cache: false,
+        dataType: 'JSONP',
+        jsonpCallback: 'callback',
+        type: 'GET',
+        success: function(data){ // filter out all non-camera sites
+            data.features = data.features.filter(function(i){
+                return i.properties.hasOwnProperty('latest-images')
+            })
+        }
+    })
     .then(function(GeoJSON) {
+        console.log(GeoJSON);
         var GeoJSON_view = $.extend(true, {}, GeoJSON)
         GeoJSON_view.features.map(function(feature, i){
-                if (!feature.properties.hasOwnProperty('fov_rt')){
+                if (!feature.properties.description.hasOwnProperty('fov_rt')){
                     return
                 }
                 var coords = [[
                     [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
-                    [parseFloat(feature.properties.fov_rt[0]), parseFloat(feature.properties.fov_rt[1])],
-                    [parseFloat(feature.properties.fov_lft[0]), parseFloat(feature.properties.fov_lft[1])],
+                    [parseFloat(feature.properties.description.fov_rt[0]), parseFloat(feature.properties.description.fov_rt[1])],
+                    [parseFloat(feature.properties.description.fov_lft[0]), parseFloat(feature.properties.description.fov_lft[1])],
                     [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
                 ]];
                 feature.geometry = {
@@ -370,7 +384,7 @@ function loadGeoJSON(){
             },
             zIndex: 5,
             filter: function(feature, layer){
-                return SelectedCams.includes(feature.properties.id)
+                return SelectedCams.includes(feature.properties.description.id)
             }
         }).addTo(map);
         if (FireCams) {map.removeLayer(FireCams)}
@@ -382,25 +396,25 @@ function loadGeoJSON(){
                         iconUrl: './lib/if_arrow-circle-up_1608521.svg',
                         iconSize: 15
                     }),
-                    rotationAngle: parseFloat(feature.properties.az_current),
+                    rotationAngle: parseFloat(feature.properties.description.az_current),
                     rotationOrigin: 'center',
-                    title: feature.properties.id
+                    title: feature.properties.description.id
                 });
             },
             zIndex: 6
         }).addTo(map);
         FireCams.on('click', function(f){
-            var id = f.layer.feature.properties.id;
+            var id = f.layer.feature.properties.description.id;
             map.removeLayer(FireViews);
             if (SelectedCams.includes(id)) {
                 SelectedCams.splice(SelectedCams.indexOf(id), 1);
             } else {
                 SelectedCams.push(id);
+                setCameraDiv(id);
             }
             reloadCamViews();
             console.log(JSON.stringify(SelectedCams));
             document.cookie = 'FireDash='+SelectedCams.join('|');
-            setCameraDiv(id);
         });
     });
     function reloadCamViews(){
@@ -415,7 +429,7 @@ function loadGeoJSON(){
             },
             zIndex: 4,
             filter: function(feature, layer){
-                return SelectedCams.includes(feature.properties.id)
+                return SelectedCams.includes(feature.properties.description.id)
             }
         });
         map.addLayer(FireViews);
