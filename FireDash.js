@@ -6,7 +6,7 @@ String.prototype.format = function () {
 };
 var map,
     SelectedCams = getFireDashCookie(),
-    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill']
+    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill'];
     generator = CameraGenerator(),
     USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
     WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
@@ -21,37 +21,29 @@ var map,
     NasaGibs_url = 'https://gibs-{s}.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg',
     //FireCam_url = 'http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1',
     FireCam_url = 'https://firemap.sdsc.edu:5443/stations?selection=boundingBox&minLat=32.5121&minLon=-124.6509&maxLat=49&maxLon=-114.1315',
-    FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image";
+    FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image",
+    USGS_elevationQuery_url = 'https://nationalmap.gov/epqs/pqs.php?x={}&y={}&units=Feet&output=json';
     
+function toDDM(dd){
+    var degrees = Math.floor(dd)
+    var minutes = (dd - degrees ) * 60
+    return degrees + '&deg; ' + minutes.toFixed(3) + "'";
+}
 function refreshCam(){
     for (var c=0; c < 3; c++){
         // get the camera element
         var element = document.getElementById('camera' + c);
         var id  = SelectedCams[generator.next().value];
-        if (id == undefined){
-            element.title = 'Select cameras from the map'
-            element.src = './lib/alert-tahoe-logo.png'
+        if (id === undefined){
+            element.title = 'Select cameras from the map';
+            element.src = './lib/alert-tahoe-logo.png';
         } else {
-            element.title = id
+            element.title = id;
             element.src = FireCamImage.format(id) + '?' + new Date().getTime();
         }
     }
     // re-load the camera geoJSON
     $(loadGeoJSON());
-};
-function check_times() {
-    var date_time_array = [dat1.air_temp_value_1.date_time, dat2.air_temp_value_1.date_time];
-    for (var date_time in date_time_array) {
-        date_time = new Date(date_time_array[date_time]); // now datetime
-        var update = new Date(date_time).setHours(date_time.getHours() + 1, // now + 1 hour
-                                                  date_time.getMinutes() + 10); // generally takes 10 minutes for MesoWest to update
-        
-        if (update < new Date()) { // reload weather if it's been an hour since the last update
-            console.log('Reloading weather');
-            document.getElementById("weatherTable").outerHTML = "";
-            mywidget.request(mywidget.default_station);
-        }
-    }
 }
 function getCookie(c_name) {
     if (document.cookie.length > 0) {
@@ -68,14 +60,14 @@ function getCookie(c_name) {
 function getFireDashCookie(){
     var cookie = getCookie('FireDash');
     if (cookie){
-        return cookie.split('|')
+        return cookie.split('|');
     } else {
-        return []
+        return [];
     }
 }
 function setCameraDiv(id){
     var position = SelectedCams.length - 1;
-    if (position > 2){return}; // only change the views for the first 3 chosen
+    if (position > 2){return;} // only change the views for the first 3 chosen
     var element = document.getElementById('camera' + position);
     element.src = FireCamImage.format(id);
     element.title = id;
@@ -101,12 +93,12 @@ function* CameraGenerator(){
         }
         i++;
         if (i + (group * 3) >= SelectedCams.length){ // if the last group has less than 3,
-            yield i + ((group-1) * 3)                // keep the previous group in the other spots
+            yield i + ((group-1) * 3);                // keep the previous group in the other spots
         } else {
             yield i + (group * 3);
         }
     }
-};
+}
 
 // fullscreen buttons
 $(function() {
@@ -155,7 +147,7 @@ $(function() {
         id: 'USGSTopo',
         maxZoom: 13,
         zIndex: 1
-    });
+    }).bindPopup();
     var WorldImage = L.esri.dynamicMapLayer({
         url: WorldImage_url,
         id: 'WorldImage',
@@ -212,7 +204,7 @@ $(function() {
         layers: 'ndgd_smoke_sfc_1hr_avg_time:smoke_colormap',
         format: 'image/png',
         opacity: 0.6,
-        zIndex: 6
+        zIndex: 100
     });
     // Leaflet initialize map
     map = L.map('map', {
@@ -226,6 +218,18 @@ $(function() {
         fadeAnimation: false,
         layers: [USGSTopo, WorldImage, FSAdmin, FSTopo, GeoMac],
     });
+    // Map popup
+    map.on('click', function(e){
+        $.getJSON(USGS_elevationQuery_url.format(e.latlng.lng, e.latlng.lat), 
+            function(data){
+                var elevation = data.USGS_Elevation_Point_Query_Service.Elevation_Query;
+                map.openPopup('{}<br>{}<br>{} {}'.format(toDDM(e.latlng.lat), 
+                                                         toDDM(e.latlng.lng), 
+                                                         elevation.Elevation.toFixed(), 
+                                                         elevation.Units), e.latlng);
+            }
+        )
+    })
     // Layer controls
     var basemaps = {
         'USGS Topo': USGSTopo,
@@ -397,11 +401,11 @@ function loadGeoJSON(){
                     }),
                     rotationAngle: parseFloat(feature.properties.description.az_current),
                     rotationOrigin: 'center',
-                    title: feature.properties.description.id
+                    //title: feature.properties.description.id
                 });
             },
             zIndex: 6
-        }).addTo(map);
+        }).bindTooltip(function(e){return e.feature.properties.description.id}, {opacity: 0.7}).addTo(map);
         FireCams.on('click', function(f){
             var id = f.layer.feature.properties.description.id;
             map.removeLayer(FireViews);
@@ -432,7 +436,6 @@ function loadGeoJSON(){
             }
         });
         map.addLayer(FireViews);
-        console.log(FireViews);
         map.removeLayer(FireCams);
         map.addLayer(FireCams);
     };
