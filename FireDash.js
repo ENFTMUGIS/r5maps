@@ -24,10 +24,15 @@ var map,
     FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image",
     USGS_elevationQuery_url = 'https://nationalmap.gov/epqs/pqs.php?x={}&y={}&units=Feet&output=json';
     
-function toDDM(dd){
-    var degrees = Math.floor(dd)
-    var minutes = (dd - degrees ) * 60
-    return degrees + '&deg; ' + minutes.toFixed(3) + "'";
+function toDDM(coord){
+    this.convert = function(_coord){
+        _coord = Math.abs(_coord)
+        var degrees = Math.floor(_coord)
+        var minutes = (_coord - degrees ) * 60
+        return degrees + '&deg; ' + minutes.toFixed(3) + "'";
+    }
+    this.lat = this.convert(coord.lat) + (coord.lat > 0 ? ' N' : ' S');
+    this.lng = this.convert(coord.lng) + (coord.lng > 0 ? ' E' : ' W');
 }
 function refreshCam(){
     for (var c=0; c < 3; c++){
@@ -79,12 +84,12 @@ function* CameraGenerator(){
     while (true){
         let number_of_groups = Math.ceil(SelectedCams.length / 3) - 1;
         // iterate i: 0, 1, 2...
-        if (i > 1) {
+        if (i == 2) {
             i = -1;
             n++;
         }
         // iterate n: 0, 1, 2...
-        if (n > 2){
+        if (n == 3){
             n = 0;
             group++; // move to next group of cameras
             if (group > number_of_groups){ // reset the group at the end
@@ -217,14 +222,16 @@ $(function() {
         ],
         fadeAnimation: false,
         layers: [USGSTopo, WorldImage, FSAdmin, FSTopo, GeoMac],
+        maxZoom: 20
     });
     // Map popup
     map.on('click', function(e){
         $.getJSON(USGS_elevationQuery_url.format(e.latlng.lng, e.latlng.lat), 
             function(data){
+                var ddm = new toDDM(e.latlng)
                 var elevation = data.USGS_Elevation_Point_Query_Service.Elevation_Query;
-                map.openPopup('{}<br>{}<br>{} {}'.format(toDDM(e.latlng.lat), 
-                                                         toDDM(e.latlng.lng), 
+                map.openPopup('{}<br>{}<br>{} {}'.format(ddm.lat, 
+                                                         ddm.lng, 
                                                          elevation.Elevation.toFixed(), 
                                                          elevation.Units), e.latlng);
             }
