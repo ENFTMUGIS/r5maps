@@ -24,7 +24,7 @@ table{
     border: 0px;
     table-layout: fixed;
     width: 100%;
-    text-align: left;
+    text-align: left;
 } 
 tr,td {
     border: 0px;
@@ -38,7 +38,7 @@ tr,td {
     table-layout: auto;
     border-collapse: collapse;
     width: auto;
-    text-align: left;
+    text-align: left;
 }
 #weatherTable td, #weatherTable tr, #weatherTable th{
     border-collapse: collapse;
@@ -69,19 +69,19 @@ tr,td {
     width: 100%;
     height: 100%;
 }
-.compass{
+.viewContainer .compass{
     position: absolute;
-    top: -50%;
-    right: 50%;
-    max-width: 800px;
-    width: 800px;
-    height: 800px;
-    transform: rotateX(60deg) rotateZ(-200deg) translate(-50%, -50%);
+    top: 110%;
+    left: 50%;
+    max-width: 600px;
+    width: 600px;
+    height: 600px;
+    /*transform: translate(-50%, -50%) rotateX(70deg) rotateZ(-20deg)*/;
 }
 /* img fullscreen */
 .viewContainer {
     position: relative;
-    /*overflow: hidden;*/
+    overflow: hidden;
 }
 .viewContainer img {
     width: 100%;
@@ -119,6 +119,16 @@ tr,td {
 }
 #day-panel div {
     width: 10em;
+}
+.mapToolTip {
+    background-color: black;
+
+}
+.leaflet-tooltip-left.mapToolTip::before {
+    border-left-color: cyan;
+}
+.leaflet-tooltip-right.mapToolTip::before {
+    border-right-color: cyan;
 }
 /* Tooltip container */
 .tooltip {
@@ -198,6 +208,7 @@ crossorigin=""></script>
             <div class='viewContainer'>
                 <img src="./lib/alert-tahoe-logo.png" id="camera0" class='cameraView' title='Select cameras from the map'>
                 <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+                <img id='compass0' src='./lib/compass_ring.svg' class='compass'>
             </div>
         </td>
     </tr>
@@ -206,13 +217,14 @@ crossorigin=""></script>
             <div class='viewContainer'>
                 <img src="./lib/alert-tahoe-logo.png" id="camera1" class='cameraView' title='Select cameras from the map'>
                 <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
+                <img id='compass1' src='./lib/compass_ring.svg' class='compass'>
             </div>
         </td>
         <td>
             <div class='viewContainer'>
                 <img src="./lib/alert-tahoe-logo.png" id="camera2" class='cameraView' title='Select cameras from the map'>
                 <button class="ui-button ui-widget ui-corner-all" title='Fullscreen' style='width:20px;height:20px;padding:0;'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
-                <!--<img src='./lib/compass-rose.png' class='compass'>-->
+                <img id='compass2' src='./lib/compass_ring.svg' class='compass'>
             </div>
         </td>
     </tr>

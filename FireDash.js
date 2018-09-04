@@ -4,9 +4,10 @@ String.prototype.format = function () {
     return typeof args[i] != 'undefined' ? args[i++] : '';
   });
 };
-var map,
+var map, FireCams, FireViews, camGeoJSON, viewGeoJSON,
     SelectedCams = getFireDashCookie(),
-    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill'];
+    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill'],
+    SelectedCams_azimuth = [0, 0, 0]
     generator = CameraGenerator(),
     USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
     WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
@@ -35,20 +36,25 @@ function toDDM(coord){
     this.lng = this.convert(coord.lng) + (coord.lng > 0 ? ' E' : ' W');
 }
 function refreshCam(){
+    // re-load the camera geoJSON
+    loadGeoJSON()
     for (var c=0; c < 3; c++){
         // get the camera element
         var element = document.getElementById('camera' + c);
-        var id  = SelectedCams[generator.next().value];
+        // get the inde of the next camera
+        var index = generator.next().value;
+        var id  = SelectedCams[index];
         if (id === undefined){
             element.title = 'Select cameras from the map';
             element.src = './lib/alert-tahoe-logo.png';
         } else {
             element.title = id;
             element.src = FireCamImage.format(id) + '?' + new Date().getTime();
+            // set the compass rotation
+            if (camGeoJSON === undefined){continue}
+            document.getElementById('compass' + c).style.transform = "translate(-50%, -50%) rotateX(65deg) rotateZ(-{}deg)".format(SelectedCams_azimuth[index]);
         }
     }
-    // re-load the camera geoJSON
-    $(loadGeoJSON());
 }
 function getCookie(c_name) {
     if (document.cookie.length > 0) {
@@ -76,6 +82,7 @@ function setCameraDiv(id){
     var element = document.getElementById('camera' + position);
     element.src = FireCamImage.format(id);
     element.title = id;
+    document.getElementById('compass' + position).style.transform = "translate(-50%, -50%) rotateX(65deg) rotateZ(-{}deg)".format(SelectedCams_azimuth[SelectedCams.indexOf(id)]);
 }
 function* CameraGenerator(){
     let group = 0;
@@ -150,19 +157,19 @@ $(function() {
     var USGSTopo = L.esri.tiledMapLayer({
         url: USGSTopo_url,
         id: 'USGSTopo',
-        maxZoom: 13,
+        maxZoom: 12,
         zIndex: 1
     }).bindPopup();
     var WorldImage = L.esri.dynamicMapLayer({
         url: WorldImage_url,
         id: 'WorldImage',
-        minZoom: 13,
+        minZoom: 15,
         zIndex: 1
     });
     var FSTopo = L.esri.dynamicMapLayer({
         url: FSTopo_url,
         id: 'FSTopo',
-        minZoom: 12,
+        minZoom: 13,
         zIndex: 2
     });
     var FSAdmin = L.esri.dynamicMapLayer({
@@ -178,6 +185,13 @@ $(function() {
         transparent: true,
         zIndex: 3
     });
+    var DPA = L.esri.dynamicMapLayer({
+        url: 'http://egis.fire.ca.gov/arcgis/rest/services/FRAP/DPA/MapServer',
+        id: 'DPA',
+        layers: [0],
+        opacity: 0.6,
+        zIndex: 4
+    })
     var GeoMac = L.esri.dynamicMapLayer({
         url: Geomac_url,
         id: 'GeoMac',
@@ -226,6 +240,7 @@ $(function() {
     });
     // Map popup
     map.on('click', function(e){
+        console.log(e.latlng)
         $.getJSON(USGS_elevationQuery_url.format(e.latlng.lng, e.latlng.lat), 
             function(data){
                 var ddm = new toDDM(e.latlng)
@@ -246,6 +261,7 @@ $(function() {
         'FS Topo': FSTopo,
         'Fuel Type': FuelType,
         'Fire Zones': FireZone,
+        'DPA': DPA,
         'Surface Smoke': Smoke,
         'Nexrad Radar': Nexrad,
         'Fire Incidents': GeoMac,
@@ -345,7 +361,6 @@ $(function() {
 });
 
 // Get the Fire Cams
-var FireCams, FireViews, camGeoJSON, viewGeoJSON;
 function loadGeoJSON(){
     $.ajax({
         url: FireCam_url,
@@ -357,6 +372,12 @@ function loadGeoJSON(){
             data.features = data.features.filter(function(i){
                 return i.properties.hasOwnProperty('latest-images')
             })
+            // set the azimuth for the compass array
+            for (var i in data.features){
+                if (SelectedCams.includes(data.features[i].properties.description.id)){
+                    SelectedCams_azimuth[SelectedCams.indexOf(data.features[i].properties.description.id)] = data.features[i].properties.description.az_current
+                }
+            }
         }
     })
     .then(function(GeoJSON) {
@@ -408,25 +429,31 @@ function loadGeoJSON(){
                     }),
                     rotationAngle: parseFloat(feature.properties.description.az_current),
                     rotationOrigin: 'center',
-                    //title: feature.properties.description.id
                 });
             },
             zIndex: 6
-        }).bindTooltip(function(e){return e.feature.properties.description.id}, {opacity: 0.7}).addTo(map);
+        }).bindTooltip(function(e){return e.feature.properties.description.id}, 
+            {
+                opacity: 0.7,
+                classname: 'mapToolTip'
+            }).addTo(map);
         FireCams.on('click', function(f){
             var id = f.layer.feature.properties.description.id;
             map.removeLayer(FireViews);
             if (SelectedCams.includes(id)) {
                 SelectedCams.splice(SelectedCams.indexOf(id), 1);
+                SelectedCams_azimuth.splice(SelectedCams.indexOf(id), 1)
             } else {
                 SelectedCams.push(id);
+                SelectedCams_azimuth.push(f.layer.feature.properties.description.az_current)
                 setCameraDiv(id);
             }
             reloadCamViews();
             console.log(JSON.stringify(SelectedCams));
             document.cookie = 'FireDash='+SelectedCams.join('|');
         });
-    });
+        return camGeoJSON;
+    })
     function reloadCamViews(){
         FireViews = L.geoJSON(viewGeoJSON, {
             id: 'FireViews',
