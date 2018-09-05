@@ -56,25 +56,44 @@ function refreshCam(){
         }
     }
 }
-function getCookie(c_name) {
-    if (document.cookie.length > 0) {
-        c_start = document.cookie.indexOf(c_name + "=");
-        if (c_start != -1) {
-            c_start = c_start + c_name.length + 1;
-            c_end = document.cookie.indexOf(";", c_start);
-            if (c_end == -1) c_end = document.cookie.length;
-            return unescape(document.cookie.substring(c_start, c_end));
+function roadQuery(security_id, road){
+    $('#search-status').html('Searching...');
+    if (isNaN(road[0])){
+        var query_url = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RoadBasicForSync_01/FeatureServer/2/query?where=SECURITY_ID = '{}' AND NAME LIKE '%{}%'&outFields=*&outSR=&f=geojson";
+    } else{
+        var query_url = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RoadBasicForSync_01/FeatureServer/2/query?where=SECURITY_ID = '{}' AND ID = '{}'&outFields=*&outSR=&f=geojson";
+    }
+    $.ajax({
+        url: query_url.format(security_id, road.toUpperCase()),
+        dataType: 'JSON',
+        jsonpCallback: 'callback',
+        type: 'GET',
+        success: function(query_result){
+            // remove the last query
+            map.eachLayer(function (layer) {
+                if (layer.options.id === 'RoadQuery'){
+                    layer.remove();
+                }
+            });
+            // display the number of road features returned
+            $('#search-status').html('{} features returned'.format(query_result.features.length));
+            var RoadQuery = L.geoJSON(query_result, {
+                id: 'RoadQuery',
+                style:  {
+                    weight: 5,
+                    color: '#00FFFF',
+                    opacity: 1,
+                },
+                zIndex: 6,
+            }).bindPopup(function(layer){
+                return layer.feature.properties.NAME +'<br>'+ layer.feature.properties.ID +'<br>'+
+                layer.feature.properties.OBJECTIVE_MAINT_LEVEL +'<br>'+ layer.feature.properties.SURFACE_TYPE;
+            });
+            map.flyToBounds(RoadQuery.getBounds());
+            RoadQuery.addTo(map);
+            RoadQuery.openPopup();
         }
-    }
-    return '';
-}
-function getFireDashCookie(){
-    var cookie = getCookie('FireDash');
-    if (cookie){
-        return cookie.split('|');
-    } else {
-        return [];
-    }
+    })
 }
 function setCameraDiv(id){
     var position = SelectedCams.length - 1;
@@ -109,6 +128,27 @@ function* CameraGenerator(){
         } else {
             yield i + (group * 3);
         }
+    }
+}
+
+function getCookie(c_name) {
+    if (document.cookie.length > 0) {
+        c_start = document.cookie.indexOf(c_name + "=");
+        if (c_start != -1) {
+            c_start = c_start + c_name.length + 1;
+            c_end = document.cookie.indexOf(";", c_start);
+            if (c_end == -1) c_end = document.cookie.length;
+            return unescape(document.cookie.substring(c_start, c_end));
+        }
+    }
+    return '';
+}
+function getFireDashCookie(){
+    var cookie = getCookie('FireDash');
+    if (cookie){
+        return cookie.split('|');
+    } else {
+        return [];
     }
 }
 
@@ -159,7 +199,7 @@ $(function() {
         id: 'USGSTopo',
         maxZoom: 12,
         zIndex: 1
-    }).bindPopup();
+    });
     var WorldImage = L.esri.dynamicMapLayer({
         url: WorldImage_url,
         id: 'WorldImage',
@@ -170,8 +210,23 @@ $(function() {
         url: FSTopo_url,
         id: 'FSTopo',
         minZoom: 13,
+        transparent: true,
         zIndex: 2
     });
+    var FSRoads = L.esri.dynamicMapLayer({
+        url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RoadBasic_01/MapServer',
+        id: 'FSRoads',
+        minZoom: 11,
+        zIndex: 2
+    })
+    var USGSContour = L.tileLayer.wms(
+        'https://elevation.nationalmap.gov/arcgis/services/3DEPElevation/ImageServer/WMSServer?',
+        {id: 'USGSContour',
+        layers: ['Contour 25'],
+        format: 'image/png',
+        transparent: true,
+        zIndex: 2
+    })
     var FSAdmin = L.esri.dynamicMapLayer({
         url: FSAdmin_url,
         id: 'FSAdmin',
@@ -179,7 +234,8 @@ $(function() {
         zIndex: 2
     });
     var FireZone = L.tileLayer.wms(
-        FireZone_url,{        id: 'Smoke',
+        FireZone_url,{        
+        id: 'FireZone',
         layers: [8],
         format:'image/png', 
         transparent: true,
@@ -235,7 +291,7 @@ $(function() {
             [120, 220]
         ],
         fadeAnimation: false,
-        layers: [USGSTopo, WorldImage, FSAdmin, FSTopo, GeoMac],
+        layers: [USGSTopo, WorldImage, FSAdmin, FSTopo, GeoMac, FSRoads],
         maxZoom: 20
     });
     // Map popup
@@ -259,6 +315,8 @@ $(function() {
     var overlays = {
         'World Imagery': WorldImage,
         'FS Topo': FSTopo,
+        'USGSContour' : USGSContour,
+        'FSRoads': FSRoads,
         'Fuel Type': FuelType,
         'Fire Zones': FireZone,
         'DPA': DPA,
@@ -314,6 +372,7 @@ $(function() {
         layer = L.tileLayer(template, {
             layer: 'MODIS_Terra_CorrectedReflectance_TrueColor',
             id: 'MODIS',
+            pane: 'mapPane',
             zIndex: -1,
             tileMatrixSet: 'GoogleMapsCompatible_Level9',
             time: dayParameter(),
