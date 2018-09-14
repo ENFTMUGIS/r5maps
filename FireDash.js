@@ -325,6 +325,7 @@ $(function() {
         ]
     }).addTo(map);
     */
+    var ESRITopo = L.esri.basemapLayer("Topographic");
     var USGSTopo = L.esri.tiledMapLayer({
         url: USGSTopo_url,
         id: 'USGSTopo',
@@ -343,12 +344,20 @@ $(function() {
         //maxZoom: 12,
         zIndex: 2
     });
-    var FSWilderness = L.esri.featureLayer({
-        url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_WildernessForSync_01/FeatureServer/0',
+    var FSWilderness = L.esri.dynamicMapLayer({
+        url: 'https://apps.fs.usda.gov/arcx/rest/services/wo_nfs_gstc/GSTC_IVMReference_01/MapServer',
         id: 'FSWilderness',
-        minZoom: 11,
+        //minZoom: 11,
+        layers: [6],
         zIndex: 2,
-        opacity: 0.5,
+        opacity: 0.6,
+    });
+    var FSCarto = L.esri.dynamicMapLayer({
+        url: 'https://apps.fs.usda.gov/arcx/rest/services/wo_nfs_gstc/GSTC_IVMCartography_01/MapServer',
+        id: 'FSCarto',
+        minZoom: 12,
+        layers: [2, 3, 4, 5, 6],
+        zIndex: 2,
     });
     var FSOwner = L.esri.dynamicMapLayer({
         url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_BasicOwnership_02/MapServer',
@@ -368,7 +377,7 @@ $(function() {
                     "symbol": {
                         "type": "esriSFS",
                         "style": "esriSFSSolid",
-                        "color": [255, 255, 255, 255],
+                        "color": [100, 100, 100, 255],
                         "outline": {
                             "type": "esriSLS",
                             "style": "esriSLSSolid",
@@ -388,7 +397,7 @@ $(function() {
         opacity: 0.5,
         zIndex: 2
     });
-    var FSTrails = L.esri.featureLayer({
+    var FSTrails_custom = L.esri.featureLayer({
         url: FSTrail_url,
         id: 'FSTrails',
         minZoom: 12,
@@ -408,9 +417,9 @@ $(function() {
     }).bindPopup(function(layer){
         return '<b>'+ layer.feature.properties.TRAIL_NO +' | '+ layer.feature.properties.TRAIL_NAME+'</b>';
     });
-    var FSRoads = L.esri.featureLayer({
+    var FSRoads_custom = L.esri.featureLayer({
         url: FSRoad_url,
-        id: 'FSRoads',
+        id: 'FSRoads_custom',
         minZoom: 12,
         zIndex: 2,
         ignoreRenderer: true,
@@ -441,7 +450,7 @@ $(function() {
     var FSRec = L.esri.featureLayer({
         url: FSRec_url,
         id: 'FSRec',
-        minZoom: 11,
+        minZoom: 12,
         zIndex: 3
     }).bindPopup(function(layer){
         return '<b>'+ layer.feature.properties.SITE_NAME +'</b><br>'+ layer.feature.properties.SITE_TYPE +
@@ -459,11 +468,10 @@ $(function() {
           return featureCollection.features[0].properties.ID;
         }
     });
-    var Custom_FSTopo = L.layerGroup([FSWilderness, FSOwner, FSAdmin, FSRoads, FSTrails, FSRec])
+    var Custom_FSTopo = L.layerGroup([FSWilderness, FSOwner, FSAdmin, FSCarto, FSRec])
     var FSTopo = L.esri.dynamicMapLayer({
         url: FSTopo_url,
         id: 'FSTopo',
-        minZoom: 13,
         transparent: true,
         zIndex: 2
     });
@@ -542,7 +550,7 @@ $(function() {
             [120, 220]
         ],
         fadeAnimation: false,
-        layers: [USGSTopo, WorldImage, Custom_FSTopo, GeoMac],
+        layers: [ESRITopo, WorldImage, Custom_FSTopo, GeoMac],
         maxZoom: 20
     });
     // Map popup
@@ -561,11 +569,10 @@ $(function() {
     })
     // Layer controls
     var basemaps = {
-        'USGS Topo': USGSTopo,
+        'ESRI Topo': ESRITopo,
     };
     var overlays = {
         'World Imagery': WorldImage,
-        'FSRoads2': FSRoads2,
         'FS Layers': Custom_FSTopo,
         'FS Topo': FSTopo,
         'Fuel Type': FuelType,
