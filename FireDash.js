@@ -43,6 +43,7 @@ var map, FireCams, FireViews, camGeoJSON, viewGeoJSON,
             Waterbody:""}
         };
     
+function FlyTo(latlng, number){map.flyTo(latlng, number)}
 function toDDM(coord){
     // Convert coordinates to DDM for map popup    
     this.convert = function(_coord){
@@ -309,22 +310,7 @@ $(function() {
 // Map
 $(function() {
     refreshCam(); // refresh off the start
-    /*var searchControl = L.esri.Geocoding.geosearch({
-        position: 'topleft',
-        placeholder: 'Search FS data',
-        providers: [
-            L.esri.Geocoding.featureLayerProvider({
-                url: FSRoad_url,
-                searchFields: ['ID', 'NAME'],
-                label: 'Roads',
-                bufferRadius: 5000,
-                formatSuggestion: function(feature){
-                    return feature.properties.ID + ' | ' + feature.properties.NAME;
-                }
-            })
-        ]
-    }).addTo(map);
-    */
+    
     var ESRITopo = L.esri.basemapLayer("Topographic");
     var USGSTopo = L.esri.tiledMapLayer({
         url: USGSTopo_url,
@@ -381,8 +367,8 @@ $(function() {
                         "outline": {
                             "type": "esriSLS",
                             "style": "esriSLSSolid",
-                            "color": [0, 0, 0, 0],
-                            "width": 0
+                            "color": [200, 200, 200, 200],
+                            "width": 0.5
                         }
                     }
                 },
@@ -397,78 +383,42 @@ $(function() {
         opacity: 0.5,
         zIndex: 2
     });
-    var FSTrails_custom = L.esri.featureLayer({
+    var FSTrails = L.esri.featureLayer({
         url: FSTrail_url,
         id: 'FSTrails',
         minZoom: 12,
         zIndex: 2,
         ignoreRenderer: true,
-    }).setStyle(function(f){
-        switch(f.properties.TERRA_MOTORIZED){
-            case 'Y':
-                return {color: 'red', weight:1, dashArray:[7,3]};
-            case 'N':
-                return {color: 'black', weight:1, dashArray:[7,3]};
-            case null:
-                return {color: 'yellow', weight:1, dashArray:[7,3]};
-            case 'N/A':
-                return {color: 'black', weight:1, dashArray:[7,3]};
-        }
-    }).bindPopup(function(layer){
+    })
+    .setStyle({opacity: 0, weight: 2})
+    .bindPopup(function(layer){
         return '<b>'+ layer.feature.properties.TRAIL_NO +' | '+ layer.feature.properties.TRAIL_NAME+'</b>';
     });
-    var FSRoads_custom = L.esri.featureLayer({
+    var FSRoads = L.esri.featureLayer({
         url: FSRoad_url,
-        id: 'FSRoads_custom',
+        id: 'FSRoads',
         minZoom: 12,
         zIndex: 2,
         ignoreRenderer: true,
-    }).setStyle(function(f){
-        // closed roads
-        if (['ADMIN', null].includes(f.properties.OPENFORUSETO)){return {color: '#959595', weight:3, dashArray:[4,7]};}
-        switch(f.properties.SYMBOL_CODE){
-            case '517':
-                //  Paved Road 
-                return {color: 'white', weight:4};
-            case '518':
-                // Gravel Road, Suitable for Passenger Car
-                return {color: 'white', weight:3};
-            case '515':
-                // Dirt Road, Suitable for Passenger Car 
-                return {color: 'white', weight:3};
-            case '106':
-                // Road, Not Maintained for Passenger Car
-                return {color: '#959595', weight:3};
-            case '':
-                // Road, Not Maintained for Passenger Car
-                return {color: '#959595', weight:3};
-        }
-    }).bindPopup(function(layer){
-        return '<b>'+ layer.feature.properties.ID +' | '+ layer.feature.properties.NAME +'</b><br>'+ 
-                        layer.feature.properties.OPER_MAINT_LEVEL +'<br>'+ layer.feature.properties.SURFACE_TYPE;
+    })
+    .setStyle({opacity: 0, weight: 4})
+    .bindPopup(function(layer){
+        if (['ADMIN', null].includes(layer.feature.properties.OPENFORUSETO)){
+            return '<b>'+ layer.feature.properties.ID +' | '+ layer.feature.properties.NAME +'</b><i> (closed)</i>'; 
+        } else{
+            return '<b>'+ layer.feature.properties.ID +' | '+ layer.feature.properties.NAME +'</b>';}
     });
     var FSRec = L.esri.featureLayer({
         url: FSRec_url,
         id: 'FSRec',
         minZoom: 12,
         zIndex: 3
-    }).bindPopup(function(layer){
+    })
+    .bindPopup(function(layer){
         return '<b>'+ layer.feature.properties.SITE_NAME +'</b><br>'+ layer.feature.properties.SITE_TYPE +
                         '<br>'+ layer.feature.properties.OPERATOR;
     });
-    var FSRoads2 = L.esri.dynamicMapLayer({
-        url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RoadBasic_01/MapServer',
-        id: 'FSRoads',
-        minZoom: 11,
-        zIndex: 2
-    }).bindPopup(function(error, featureCollection){
-        if (error || featureCollection.features.length === 0) {
-            return false;
-        } else {
-          return featureCollection.features[0].properties.ID;
-        }
-    });
-    var Custom_FSTopo = L.layerGroup([FSWilderness, FSOwner, FSAdmin, FSCarto, FSRec])
+    var Custom_FSTopo = L.layerGroup([FSWilderness, FSOwner, FSAdmin, FSCarto, FSRec, FSTrails, FSRoads])
     var FSTopo = L.esri.dynamicMapLayer({
         url: FSTopo_url,
         id: 'FSTopo',
@@ -491,7 +441,7 @@ $(function() {
         CQL_FILTER: "type_class='TFR'", 
         transparent: true,
         zIndex: 3
-    }).bindPopup(function(e){console.log(e);});
+    });
     var FireZone = L.tileLayer.wms(
         FireZone_url,{
         id: 'FireZone',
@@ -570,11 +520,12 @@ $(function() {
     // Layer controls
     var basemaps = {
         'ESRI Topo': ESRITopo,
+        'USGS Topo': USGSTopo,
+        'FS Topo': FSTopo,
     };
     var overlays = {
         'World Imagery': WorldImage,
         'FS Layers': Custom_FSTopo,
-        'FS Topo': FSTopo,
         'Fuel Type': FuelType,
         'Fire Zones': FireZone,
         'DPA': DPA,
@@ -588,7 +539,137 @@ $(function() {
         position: 'topleft',
         sortLayers: false
     }).addTo(map);
-    
+    // Custom control
+    L.Control.Forest = L.Control.extend({
+        options: {
+            position: 'topleft',
+        },
+        initialize: function(options) {
+            L.Util.setOptions(this, options);
+        },
+        onAdd: function (map) {
+            var div = L.DomUtil.create('div');
+            var select = L.DomUtil.create('select', 'custom-control', div);
+            select.id = 'forest';
+            select.title = 'Forest';
+            for (var code in this._forestCodes){
+                var option = L.DomUtil.create('option', null, select);
+                option.value = code;
+                option.title = this._forestCodes[code][0];
+                option.innerHTML = this._forestCodes[code][1];
+                if (code === '0503'){ option.selected = 'selected'};
+            }
+            // make sure map doesn't register click event
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
+            // event to fly to forest
+            L.DomEvent.on(select, 'change', function(e){
+                var query_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundariesForSync_01/FeatureServer/1/query?where=FORESTORGCODE%3D%27{}%27&returnGeometry=true&returnExtentOnly=true&f=geojson';
+                $.ajax({
+                    url: query_url.format(select.value),
+                    dataType: 'JSON',
+                    jsonpCallback: 'callback',
+                    type: 'GET',
+                    success: function(query_result){
+                        map.flyToBounds([
+                            [query_result.bbox[1], query_result.bbox[0]],
+                            [query_result.bbox[3], query_result.bbox[2]],
+                        ]);
+                    }
+                })
+            })
+
+            return div;
+        },
+        _forestCodes: {
+            '0501': ['Angeles', 'ANF'],
+            '0502': ['Cleveland', 'CNF'],
+            '0503': ['Eldorado', 'ENF'],
+            '0504': ['Inyo', 'INF'],
+            '0505': ['Klamath', 'KNF'],
+            '0506': ['Lassen', 'LNF'],
+            '0507': ['Los Padres', 'LPF'],
+            '0508': ['Mendocino', 'MNF'],
+            '0509': ['Modoc', 'MDF'],
+            '0510': ['Six Rivers', 'SRF'],
+            '0511': ['Plumas', 'PNF'],
+            '0512': ['San Bernardino', 'BDF'],
+            '0513': ['Sequoia', 'SQF'],
+            '0514': ['Shasta-Trinity', 'SHF'],
+            '0515': ['Sierra', 'SNF'],
+            '0516': ['Stanislaus', 'STF'],
+            '0517': ['Tahoe', 'TNF'],
+            '0519': ['Lake Tahoe Basin Mgmt Unit', 'TMU']
+        }
+    });
+    L.Control.forest = function(options) {
+        return new L.Control.Forest(options);
+    };
+    L.Control.forest().addTo(map);      // Layer Search
+    var searchControl = L.esri.Geocoding.geosearch({
+        title: 'Location Search',
+        placeholder: 'Search FS locations within map bounds',
+        position: 'topleft',
+        expanded: false,
+        zoomToResult: false,
+        useMapBounds: true,
+        providers: [
+            L.esri.Geocoding.featureLayerProvider({
+                url: FSRoad_url,
+                searchFields: ['ID', 'NAME'],
+                label: 'Roads',
+                formatSuggestion: function(feature){
+                    return feature.properties.ID + ' | ' + feature.properties.NAME;
+                }
+            }),//.orderBy('NAME', 'ASC'),
+            L.esri.Geocoding.featureLayerProvider({
+                url: FSTrail_url,
+                searchFields: ['TRAIL_NO', 'TRAIL_NAME'],
+                label: 'Trails',
+                formatSuggestion: function(feature){
+                    return feature.properties.TRAIL_NO + ' | ' + feature.properties.TRAIL_NAME;
+                }
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: FSRec_url,
+                searchFields: ['SITE_NAME'],
+                label: 'Recreation',
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/1',
+                searchFields: ['gaz_name'],
+                label: 'Landforms',
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/2',
+                searchFields: ['gaz_name'],
+                label: 'Streams',
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_NHDForSync_01/MapServer/9',
+                searchFields: ['GNIS_NAME'],
+                label: 'Waterbodies',
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/13',
+                searchFields: ['gaz_name'],
+                label: 'Locales',
+            }),
+            L.esri.Geocoding.featureLayerProvider({
+                url: 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/18',
+                searchFields: ['gaz_name'],
+                label: 'Populated Places',
+            }),
+        ]
+    }).addTo(map);
+    searchControl.on('results', function(e){
+        var latlng = [e.latlng.lat, e.latlng.lng]
+        L.popup()
+            .setLatLng(e.latlng)
+            .setContent("<a title= 'Zoom To' style='cursor:pointer;' onClick='FlyTo([{}], 15)'>{}</a>".format(latlng, e.text))
+            .openOn(map);
+    });
+  
     //https://github.com/nasa-gibs/gibs-web-examples/blob/master/examples/leaflet/time.js
     // Seven day slider based off today, remember what today is
     var today = new Date();

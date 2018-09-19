@@ -135,30 +135,14 @@ tr,td {
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
-/* The container <div> - needed to position the dropdown content */
-.dropdown {
-    position: relative;
-    display: inline-block;
+#forest{
+    margin-top: 3px;
+    //margin-bottom: 4px;
 }
-/* Dropdown Content (Hidden by Default) */
-.dropdown-content {
-    font-size: 83%;
-    display: none;
-    position: absolute;
-    background-color: rgba(255,255,255,0.8);
-    min-width: 48ch;
-    max-height: 200px;
-    overflow: auto;
-    z-index: 1001;
-}
-/* Links inside the dropdown */
-.dropdown-content table{
-    white-space: nowrap;
-    overflow: hidden;
-    color: black;
-    cursor: pointer;
-    width: 100%;
-    padding-left: 1px;
+.custom-control{
+    border-radius: 4px;
+    padding: 3px;
+    border: 2px solid rgba(0, 0, 0, 0.25);
 }
 </style>
 <head>
@@ -204,35 +188,6 @@ crossorigin=""></script>
             <div id='mapDiv' style='height:100px;'>
                 <div id='map'>
                 </div>
-                <div id='road-search'>
-                    <select name='forest' id='forest'>
-                        <option value='0501' title='Angeles'>ANF</option>
-                        <option value='0502' title='Cleveland'>CNF</option>
-                        <option value='0503' title='Eldorado' selected="selected">ENF</option>
-                        <option value='0504' title='Inyo'>INF</option>
-                        <option value='0505' title='Klamath'>KNF</option>
-                        <option value='0506' title='Lassen'>LNF</option>
-                        <option value='0507' title='Los Padres'>LPF</option>
-                        <option value='0508' title='Mendocino'>MNF</option>
-                        <option value='0509' title='Modoc'>MDF</option>
-                        <option value='0510' title='Six Rivers'>SRF</option>
-                        <option value='0511' title='Plumas'>PNF</option>
-                        <option value='0512' title='San Bernardino'>BDF</option>
-                        <option value='0513' title='Sequoia'>SQF</option>
-                        <option value='0514' title='Shasta-Trinity'>SHF</option>
-                        <option value='0515' title='Sierra'>SNF</option>
-                        <option value='0516' title='Stanislaus'>STF</option>
-                        <option value='0517' title='Tahoe'>TNF</option>
-                        <option value='0519' title='Lake Tahoe Basin Mgmt Unit'>TMU</option>
-                    </select>
-                    <div class="dropdown">
-                        <input id='search_bar' type='text' style='width:48ch;' placeholder='Type a feature name or ID and press Enter to search'>
-                        <div id='search_dropdown' class='dropdown-content'>
-                            <table id= 'search-table' style="width:100%"></table>
-                        </div>
-                    </div>
-                    <span id='search-status' style='font-size:75%;font-style:italic;'></span>
-                </div>
                 <button id='refresh' class="ui-button ui-widget ui-corner-all" style='width:20px;height:20px;padding:0;' title='Fullscreen'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
                 <div id="day-panel">
                         <div id="day-label"></div>
@@ -269,22 +224,5 @@ crossorigin=""></script>
 <script>
 // refresh the cameras every 10 seconds
 setInterval(refreshCam, 10 * 1000);
-// Forest change event
-var forest = document.getElementById("forest");
-forest.addEventListener("change", function(event) {
-    event.preventDefault();
-    forestQuery(document.getElementById('forest').value);
-});
-// road search event
-var search_bar = document.getElementById("search_bar");
-search_bar.addEventListener("keyup", function(event) {
-    event.preventDefault();
-    if (event.keyCode === 13) {
-        var text = document.getElementById('search_bar').value
-        var security_id = document.getElementById('forest').value
-        layerQuery(security_id, text);
-        document.getElementById("search_dropdown").style.display = 'inline';
-    }
-});
 </script>
 </html>
