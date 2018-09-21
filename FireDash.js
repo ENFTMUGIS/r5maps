@@ -608,7 +608,7 @@ $(function() {
     L.Control.forest().addTo(map);      // Layer Search
     var searchControl = L.esri.Geocoding.geosearch({
         title: 'Location Search',
-        placeholder: 'Search FS locations within map bounds',
+        placeholder: 'Search locations within map bounds',
         position: 'topleft',
         expanded: false,
         zoomToResult: false,
