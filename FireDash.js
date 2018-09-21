@@ -614,7 +614,7 @@ $(function() {
         zoomToResult: false,
         useMapBounds: true,
         providers: [
-            L.esri.Geocoding.featureLayerProvider({
+            /*L.esri.Geocoding.featureLayerProvider({
                 url: FSRoad_url,
                 searchFields: ['ID', 'NAME'],
                 label: 'Roads',
@@ -634,7 +634,7 @@ $(function() {
                 url: FSRec_url,
                 searchFields: ['SITE_NAME'],
                 label: 'Recreation',
-            }),
+            }),*/
             L.esri.Geocoding.featureLayerProvider({
                 url: 'https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/1',
                 searchFields: ['gaz_name'],
