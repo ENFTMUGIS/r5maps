@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Traffic Map</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script
+    src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
+    integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
+    crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"></link>
+<!-- Reference the JavaScript API from our CDN and you are ready to get started: -->
+<link rel="stylesheet" href="https://js.arcgis.com/4.9/esri/themes/dark/main.css">
+<script src="https://js.arcgis.com/4.9/"></script>
+<script>
+String.prototype.format = function () {
+  var i = 0, args = arguments;
+  return this.replace(/{}/g, function () {
+    return typeof args[i] != 'undefined' ? args[i++] : '';
+  });
+};
+var map, view,
+    USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
+    WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
+    FSTopo_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_FSTopo_01/MapServer',
+    FSAdmin_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer',
+    FSTrail_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_TrailNFSPublishForSync_01/FeatureServer/0',
+    FSRoad_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RoadBasicForSync_01/FeatureServer/2',
+    FSRec_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RecreationSitesOpenForSync_01/FeatureServer/0',
+    USGSTransport_url = 'https://services.nationalmap.gov/arcgis/rest/services/WFS/transportation/MapServer',
+    //USGSTransport_url = 'https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer',
+    FSStations_url = 'https://apps.fs.usda.gov/fsgisx02/rest/services/wo_ops_teams/S_WO_OPS_TEAMS_EU_SOI_01/FeatureServer/0',
+    FireZone_url = 'https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/forecast_meteoceanhydro_pts_zones_geolinks/MapServer',
+    Geomac_url = 'https://wildfire.cr.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer',
+    WFAS_url = "https://www.wfas.net/cgi-bin/mapserv?map=/var/www/html/nfdr/mapfiles/ndfd_geog5.map&",
+    Nexrad_url = 'https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/radar_meteo_imagery_nexrad_time/MapServer',
+    SurfaceObservation_url = 'https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/obs_meteocean_insitu_sfc_time/MapServer',
+    Smoke_url = 'https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/ndgd_smoke_sfc_1hr_avg_time/ImageServer/WMSServer?',
+    NasaGibs_url = 'https://gibs-{s}.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg',
+    //FireCam_url = 'http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1',
+    FireCam_url = 'https://firemap.sdsc.edu:5443/stations?selection=boundingBox&minLat=32.5121&minLon=-124.6509&maxLat=49&maxLon=-114.1315',
+    FireCamImage = "http://api.nvseismolab.org/vulcan/v0/camera/{}/image",
+    USGS_elevationQuery_url = 'https://nationalmap.gov/epqs/pqs.php?x={}&y={}&units=Feet&output=json',
+    caltransLane_url = 'http://quickmap.dot.ca.gov/data/lcs2way.kml',
+    caltransCHP_url = 'http://quickmap.dot.ca.gov/data/chp-only.kml',
+    caltransClosure_url = 'http://quickmap.dot.ca.gov/data/fullClosure.kml',
+    caltransInfo_url = 'http://quickmap.dot.ca.gov/data/chin.kml'
+    caltransChain_url = 'http://quickmap.dot.ca.gov/data/cc.kml',
+    caltransSnow_url = 'http://quickmap.dot.ca.gov/data/snow_plow.kml',
+    caltransSign_url = 'http://quickmap.dot.ca.gov/data/cms.kml',
+    caltransCCTV_url = 'http://quickmap.dot.ca.gov/data/cctv.kml',
+    esriTraffic_url = 'http://utility.arcgis.com/usrsvcs/servers/8cd01a89cdc74c87893127f4438844b5/rest/services/World/Traffic/MapServer';
+    
+function closeFWF(){FWFfeature.graphic.popupTemplate.content = 'Click on a Fire Weather Zone to get the forecast...'};
+function toDDM(coord){
+    // Convert coordinates to DDM for map popup    
+    this.convert = function(_coord){
+        _coord = Math.abs(_coord);
+        var degrees = Math.floor(_coord);
+        var minutes = (_coord - degrees ) * 60;
+        return degrees + '&deg; ' + minutes.toFixed(3) + "'";
+    };
+    this.lat = this.convert(coord.latitude) + (coord.latitude > 0 ? ' N' : ' S');
+    this.lng = this.convert(coord.longitude) + (coord.longitude > 0 ? ' E' : ' W');
+}
+
+// Modeled after this:
+// https://developers.arcgis.com/javascript/latest/sample-code/sandbox/index.html?sample=layers-featurelayer-collection
+require([
+    "esri/Map",
+    "esri/views/MapView",
+    "esri/Graphic",
+    "esri/widgets/LayerList",
+    "esri/widgets/Expand",
+    "esri/widgets/Search",
+    "esri/widgets/Legend",
+    "esri/widgets/Feature",
+    "esri/layers/GroupLayer",
+    "esri/layers/MapImageLayer",
+    "esri/layers/WMSLayer",
+    "esri/layers/WebTileLayer",
+    "esri/layers/FeatureLayer",
+    "esri/geometry/Point",
+    "esri/geometry/Polygon",
+    "esri/layers/KMLLayer",
+    "esri/core/Collection",
+    "esri/layers/support/LabelClass",
+    "esri/request",
+    "esri/core/watchUtils",
+    'dojo/dom-style',
+    "dojo/on",
+    "dojo/domReady!"
+], function(Map, MapView, Graphic, LayerList, Expand, Search, Legend, Feature, GroupLayer, MapImageLayer, WMSLayer, WebTileLayer, 
+        FeatureLayer, Point, Polygon, KMLLayer, Collection, LabelClass, esriRequest, watchUtils, domStyle, on) {
+
+    var admin = new MapImageLayer({
+        url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer", // AdminBoundary
+        id: "admin",
+        title: 'Administrative Boundary'
+    });
+    var FSOwner = FeatureLayer({
+        url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_BasicOwnership_02/MapServer/0',
+        id: 'FSOwner',
+        title: 'Private Land',
+        minScale: 400000,
+        definitionExpression: "OWNERCLASSIFICATION IN ('NON-FS', 'UNPARTITIONED RIPARIAN INTEREST')",
+        renderer: {
+            type: "simple",
+            symbol: {
+                type: "simple-fill",
+                style: "solid",
+                color: [100, 100, 100, 1],
+                outline: {
+                    type: "simple-line",
+                    style: "simple",
+                    color: [200, 200, 200, 1],
+                    width: 0.5
+                }
+            }
+        },
+        opacity: 0.3,
+        visible: false
+    });
+    var FSWilderness = FeatureLayer({
+        url: 'https://apps.fs.usda.gov/arcx/rest/services/wo_nfs_gstc/GSTC_IVMReference_01/MapServer/6',
+        id: 'FSWilderness',
+        title: 'Wilderness',
+        opacity: 0.6,
+        labelsVisible: false
+    });
+    var FSStations = FeatureLayer({
+        url: FSStations_url,
+        id: 'FSStations',
+        title: 'Forest Service Offices',
+        popupTemplate: {
+            title: '{DISTRICT_NAME}',
+            content: '{FOREST_NAME}'
+        }
+    });
+    var USFSgroup = new GroupLayer({
+        title: 'US Forest Service Layers',
+        id: 'USFS',
+        layers: [FSOwner, admin, FSWilderness],
+        visibilityMode: 'independent'
+    });
+    // Fire layers
+    var perimeterPopup = {
+        title: '<b>{incidentname}</b>  <small>{gisacres} acres</small>', 
+        content: [{
+            type: "fields",
+            fieldInfos: [{
+                    fieldName: "active",
+                    label: "Active",
+                },{
+                    fieldName: "gisacres",
+                    label: "Acres",
+                    format: {digitSeparator: true, places: 0}
+                },{
+                    fieldName: "agency",
+                    label: "Agency",
+                },{
+                    fieldName: "inciwebid",
+                    label: "Inciweb ID",
+                },{
+                    fieldName: "datecurrent",
+                    label: "Last Update",
+                },{
+                    fieldName: "state",
+                    label: "State",
+                }]
+        }],
+        actions: [{
+            title: 'Inciweb',
+            id: 'inciweb-site',
+            image: './lib/inciweb-logo-blue.png'
+        }]
+    }
+    var activePerimeters = new FeatureLayer({ 
+        url: "https://wildfire.cr.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer/2", // fires
+        id: "activeFire",
+        title: 'Active Perimeters',
+        popupTemplate: perimeterPopup
+    });
+    // tried this to join the tables:
+    // https://gis.stackexchange.com/questions/282650/arcgis-js-api-join-arcgis-online-layers
+    var inactivePerimeters = new FeatureLayer({ 
+        url: "https://wildfire.cr.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer/3", // fires
+        id: "inactiveFire",
+        title: 'Inactive Perimeters',
+        popupTemplate: perimeterPopup
+    });
+    var ICS209 = new FeatureLayer({ 
+        url: "https://wildfire.cr.usgs.gov/arcgis/rest/services/geomac_perims/MapServer/0", 
+        id: "ICS209",
+        title: 'ICS-209',
+        popupTemplate: {
+            title: '<b>{incidentname}</b> {percentcontained}% contained', 
+            content: "{*}"}
+    });
+    var fireDetect = new FeatureLayer({ 
+        url: "https://wildfire.cr.usgs.gov/arcgis/rest/services/geomac_dyn/MapServer/4", 
+        id: "fireDetect",
+        title: 'MODIS Fire Detections',
+        visible: false,
+        popupTemplate: {title: '{load_stat}', content: '{date}'}
+    });
+    var PFIRS = new KMLLayer({
+        url: "https://ssl.arb.ca.gov/pfirs/kml/active.kml?date=1538158810973", 
+        title: 'PFIRS',
+        refreshInterval: 0.5,
+        visible: false,
+    });
+    var smokeLyr = new KMLLayer({
+        url: "https://www.ospo.noaa.gov/data/land/fire/smoke.kml", 
+        title: 'NOAA Smoke',
+        refreshInterval: 0.5,
+        maxScale: 80000,
+        opacity: 0.5,
+        visible: false,
+    });
+    // Get the smoke sublayers in the right drawing order
+    smokeLyr.when(function() {
+        smokeLyr.sublayers = smokeLyr.sublayers.items[0].sublayers.items[0].sublayers.items.reverse().slice(1);
+    });
+    var FSmodis = new WMSLayer({
+        url: "https://fsapps.nwcg.gov/afm/cgi-bin/mapserv.exe?map=conus.map&",
+        id: "modisDetect",
+        title: 'MODIS Fire Detections',
+        refreshInterval: 60,
+        sublayers: [{
+            name: 'Last 6 hour fire detections',
+            title: '6-hour',
+        }, {
+            name: 'Last 12 hour fire detections',
+            title: '12-hour'
+        }, {
+            name: 'Last 24 hour fire detections',
+            title: '24-hour'
+        }]
+    });
+    var EGPmodis = new MapImageLayer({
+        url: "https://utility.arcgis.com/usrsvcs/servers/07b3dbcc163e466a819d18ea329de214/rest/services/FireCOP/FireDetections/MapServer",
+        id: "EGPmodis",
+    });
+    var FIREgroup = new GroupLayer({
+        title: 'Fire Layers',
+        id: 'FIRE',
+        layers: [FSmodis, inactivePerimeters, activePerimeters, ICS209, PFIRS, smokeLyr],
+        visibilityMode: 'independent'
+    });
+    
+    var esriTraffic = new MapImageLayer({
+        url: esriTraffic_url,
+        id: "esriTraffic",
+    });
+    caltransLane = new KMLLayer({
+        url: caltransLane_url,
+        title: 'Lane Closure'
+    });
+    caltransCHP = new KMLLayer({
+        url: caltransCHP_url ,
+        title: 'CHP Incident'
+    });
+    //caltransFullClosure = new KMLLayer({
+    //    url: caltransClosure_url,
+    //    title: 'Road Closure'
+    //});
+    caltransInfo = new KMLLayer({
+        url: caltransInfo_url,
+        title: 'Highway Info'
+    });
+    caltransChain = new KMLLayer({
+        url: caltransChain_url,
+        title: 'Chain Control'
+    });
+    caltransSnow = new KMLLayer({
+        url: caltransSnow_url,
+        title: 'Snow Plow'
+    });
+    caltransSign = new KMLLayer({
+        url: caltransSign_url,
+        title: 'Message Sign'
+    });
+    caltransCCTV = new KMLLayer({
+        url: caltransCCTV_url,
+        title: 'Traffic Camera'
+    });
+    var CalTrans = new GroupLayer({
+        title: 'CalTrans Layers',
+        id: 'CalTrans',
+        layers: [esriTraffic, caltransLane, caltransCHP, /*caltransFullClosure,*/ caltransInfo, caltransChain, caltransSnow, caltransSign, caltransCCTV, ],
+        visibilityMode: 'independent'
+    });
+
+    map = new Map({
+        basemap: "gray",
+//        ground: "world-elevation",
+        layers: [USFSgroup, FIREgroup, CalTrans, FSStations]
+    });
+    view = new MapView({
+        container: "map",  // Reference to the DOM node that will contain the view
+        map: map,               // References the map object created in step 3
+        center: [-120.3, 38.85],
+        zoom: 10
+    });
+
+    /************************************************
+    *                Click Events                   *
+    ************************************************/
+    // Click on fire cam
+    // Event handler that fires each time an action is clicked.
+    view.popup.on("trigger-action", function(event) {
+        if (event.action.id === "inciweb-site") {
+            if (event.target.features[0].attributes.inciwebid.trim().length > 0){
+                window.open('https://inciweb.nwcg.gov/incident/'+event.target.features[0].attributes.inciwebid);
+            } else {
+                window.open('https://inciweb.nwcg.gov/')
+            }
+        }
+    });
+    /************************************************
+    *        Load the cameras and widgets           *
+    ************************************************/
+    view.when(function() {
+        // LayerList widget
+        layerList = new LayerList({
+            container: document.createElement("div"),
+            view: view,
+            //listItemCreatedFunction: function (event) {
+            //    const item = event.item;
+            //    item.panel = {
+            //        content: "legend",
+            //    };
+            //}
+        });
+        view.ui.add(layerList, "top-left");
+        // Legend widget
+        var legend = new Legend({
+            container: document.createElement("div"),
+            view: view,
+            style: 'classic',//{type:'card', layout: 'stack'},
+        });
+        legendExpand = new Expand({
+            expandIconClass: "esri-icon-layers",  // see https://developers.arcgis.com/javascript/latest/guide/esri-icon-font/
+            expandTooltip: "Legend", // optional, defaults to "Expand" for English locale
+            view: view,
+            content: legend.domNode
+        });
+        view.ui.add(legendExpand, "top-left");
+    });
+});
+</script>
+<style>
+html, body, #map {
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    width: 100%;
+}
+.esri-popup.esri-widget{
+    max-height: 100%;
+}
+.esri-view-width-xlarge .esri-popup__main-container {
+    width: 400px;
+    max-height: 500px;
+}
+.esri-view-height-less-than-medium .esri-popup__main-container {
+    width: 400px;
+    max-height: 500px;
+}
+</style>
+</head>
+
+<body>
+<div id="map"></div>
+</body>
+</html>
