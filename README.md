@@ -6,3 +6,5 @@ The USDA Forest Service makes no warranty, expressed or implied, including the w
 # GitHub Pages Links
 - [Camera Viewers with Map](https://r5fire.github.io/r5maps/FireCams.html)
 - [Map Only](https://r5fire.github.io/r5maps/FireMapOnly.html)
+- [Traffic Map](https://r5fire.github.io/r5maps/trafficMap.html)
+
