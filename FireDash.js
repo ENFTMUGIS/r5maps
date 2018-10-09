@@ -694,8 +694,6 @@ require([
     view.on("click", function(event){
         view.hitTest(event)
             .then(function(r){
-                console.log(r)
-                //view.ui.remove('info');
                 if (r.results[0].graphic.layer.id === 'camera') {
                     event.stopPropagation()
                     drawCameraView(r.results[0].graphic);
@@ -787,9 +785,18 @@ require([
         getStations();
     }).then(function() {
         // LayerList widget
-        layerList = new LayerList({
+        var layerList = new LayerList({
             container: document.createElement("div"),
             view: view,
+            listItemCreatedFunction: function(e){
+                if (e.item.title === 'UNR Fire Cameras'){
+                    e.item.actionsSections = [[{
+                        title: 'Clear all camera selections',
+                        className: 'esri-icon-error',
+                        id: 'clearCams'
+                    }]]
+                }
+            }
             //listItemCreatedFunction: function (event) {
             //    const item = event.item;
             //    item.panel = {
@@ -797,6 +804,13 @@ require([
             //    };
             //}
         });
+        layerList.on('trigger-action', function(e){
+            if (e.action.id === 'clearCams'){
+                SelectedCams = [];
+                SelectedCams_azimuth = [];
+                FireViews.definitionExpression = '1=2';
+            }
+        })
         layerListExpand = new Expand({
             expandIconClass: "esri-icon-layer-list",  // see https://developers.arcgis.com/javascript/latest/guide/esri-icon-font/
             expandTooltip: "LayerList", // optional, defaults to "Expand" for English locale
