@@ -5,7 +5,7 @@ String.prototype.format = function () {
   });
 };
 var map, view, FireCams, FireViews, FWFfeature,
-    SelectedCams = getFireDashCookie(),
+    //SelectedCams = getFireDashCookie(),
     SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill'],
     SelectedCams_azimuth = [0, 0, 0];
     generator = CameraGenerator(),
@@ -431,11 +431,31 @@ require([
         title: 'Roads and Trails',
         minScale: 400000,
         sublayers: [
-            {				id: 6,				visible: true,				popupEnabled: true,				popupTemplate: road_template
-            },{				id: 5,				visible: true,				popupEnabled: true,				popupTemplate: road_template
-            },{				id: 4,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
-            },{				id: 3,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
-            },{				id: 2,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
+            {
+				id: 6,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: road_template
+            },{
+				id: 5,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: road_template
+            },{
+				id: 4,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
+            },{
+				id: 3,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
+            },{
+				id: 2,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
             }
         ]
     });
@@ -548,10 +568,9 @@ require([
         popupTemplate: {title: '{load_stat}', content: '{date}'}
     });
     var PFIRS = new KMLLayer({
-        url: "https://ssl.arb.ca.gov/pfirs/kml/active.kml?date=1538158810973", 
+        url: "https://ssl.arb.ca.gov/pfirs/firm/kml/rx4.php?s=all", 
         title: 'PFIRS',
-        refreshInterval: 0.5,
-        visible: false,
+        visible: true,
     });
     var smokeLyr = new KMLLayer({
         url: "https://www.ospo.noaa.gov/data/land/fire/smoke.kml", 
@@ -782,8 +801,6 @@ require([
     *        Load the cameras and widgets           *
     ************************************************/
     view.when(function() {
-        getStations();
-    }).then(function() {
         // LayerList widget
         var layerList = new LayerList({
             container: document.createElement("div"),
