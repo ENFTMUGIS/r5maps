@@ -98,10 +98,10 @@ tr,td {
 #day-label {
     left: 1em;
     bottom: 1em;
-    color: rgb(40, 40, 40);
-    width: 100%;
+    color: rgb(220, 220, 220);
     text-align: center;
     padding-bottom: 0.5em;
+    width: 10em;
 }
 #day-panel {
     visibility: hidden;
@@ -109,11 +109,6 @@ tr,td {
     background-color: rgba(50, 50, 50, 0.85);
     z-index: 1000;
     color: rgb(220, 220, 220);
-}
-#day-panel div {
-    width: 10em;
-    color: rgb(220, 220, 220);
-    z-index: 1000;
 }
 #ttip {
     display: none;
@@ -162,7 +157,8 @@ tr,td {
                 <div id='map'></div>
                 <button id='refresh' class="ui-button ui-widget ui-corner-all" style='width:20px;height:20px;padding:0;' title='Fullscreen'><span class="ui-icon ui-icon-arrow-4-diag"></span></button>
                 <div id="day-panel">
-                        <div id="day-label"></div>
+                        <button id='satellite-name' title='Toggle Satellite'>Terra</button>
+                        <span id='day-label'></span>
                         <div id="day-slider" style="width:150px;"></div>
                 </div>
                 <span id='ttip'></span>

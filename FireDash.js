@@ -227,7 +227,8 @@ require([
         id: 'CamGroup',
         layers: [],
         visibilityMode: 'inherited',
-        visible: true
+        visible: true,
+        listMode: 'hide-children'
     });
     
     var worldImagery = new MapImageLayer({
@@ -429,33 +430,14 @@ require([
         url: 'https://apps.fs.usda.gov/arcx/rest/services/wo_nfs_gstc/GSTC_IVMCartography_01/MapServer',
         id: 'FSCarto',
         title: 'Roads and Trails',
+        listMode: 'hide-children',
         minScale: 400000,
         sublayers: [
-            {
-				id: 6,
-				visible: true,
-				popupEnabled: true,
-				popupTemplate: road_template
-            },{
-				id: 5,
-				visible: true,
-				popupEnabled: true,
-				popupTemplate: road_template
-            },{
-				id: 4,
-				visible: true,
-				popupEnabled: true,
-				popupTemplate: trail_template
-            },{
-				id: 3,
-				visible: true,
-				popupEnabled: true,
-				popupTemplate: trail_template
-            },{
-				id: 2,
-				visible: true,
-				popupEnabled: true,
-				popupTemplate: trail_template
+            {				id: 6,				visible: true,				popupEnabled: true,				popupTemplate: road_template
+            },{				id: 5,				visible: true,				popupEnabled: true,				popupTemplate: road_template
+            },{				id: 4,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
+            },{				id: 3,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
+            },{				id: 2,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
             }
         ]
     });
@@ -463,13 +445,16 @@ require([
     var FSTopo = new MapImageLayer({
         url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_FSTopo_01/MapServer",
         id: "FSTopo",
+        title: 'FS Topo',
         minScale: 200000,
+        listMode: 'hide-children',
         visible: false
     });
     var admin = new MapImageLayer({
         url: "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_ForestSystemBoundaries_01/MapServer", // AdminBoundary
         id: "admin",
-        title: 'Administrative Boundary'
+        title: 'Administrative Boundary',
+        listMode: 'hide-children',
     });
     var FSOwner = FeatureLayer({
         url: 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_BasicOwnership_02/MapServer/0',
@@ -508,7 +493,7 @@ require([
     });
     // Fire layers
     var perimeterPopup = {
-        title: '<b>{incidentname}</b>  <small>{gisacres} acres</small>', 
+        title: '<b>{incidentname}</b>  <small>{expression/acres} acres</small>', 
         content: [{
             type: "fields",
             fieldInfos: [{
@@ -531,6 +516,11 @@ require([
                     fieldName: "state",
                     label: "State",
                 }]
+        }],
+        expressionInfos: [{
+            name: 'acres',
+            title: 'Rounded Acres',
+            expression: 'Round($feature.gisacres, 0)'
         }],
         actions: [{
             title: 'Inciweb',
@@ -568,9 +558,11 @@ require([
         popupTemplate: {title: '{load_stat}', content: '{date}'}
     });
     var PFIRS = new KMLLayer({
+        //url: "https://ssl.arb.ca.gov/pfirs/kml/active.kml?date={}".format(new Date().getTime()), 
         url: "https://ssl.arb.ca.gov/pfirs/firm/kml/rx4.php?s=all", 
         title: 'PFIRS',
         visible: true,
+        listMode: 'hide-children',
     });
     var smokeLyr = new KMLLayer({
         url: "https://www.ospo.noaa.gov/data/land/fire/smoke.kml", 
@@ -604,6 +596,17 @@ require([
         url: "https://utility.arcgis.com/usrsvcs/servers/07b3dbcc163e466a819d18ea329de214/rest/services/FireCOP/FireDetections/MapServer",
         id: "EGPmodis",
     });
+    var TFRs = new WMSLayer({
+        //url: 'https://sua.faa.gov:80/geoserver/wms?',
+        url: 'http://nfdc1.faa.gov/geoserver/wms',
+        version: "1.3.0",        
+        id: 'TFRs',
+        title: 'FAA Temp Flight Restrictions',
+        sublayers: [{name:'SUA:schedule', title: 'TFR'}],
+        customLayerParameters: {
+            CQL_FILTER: "type_class='TFR'"
+        },   
+    });
     var FIREgroup = new GroupLayer({
         title: 'Fire Layers',
         id: 'FIRE',
@@ -611,10 +614,21 @@ require([
         visibilityMode: 'independent'
     });
     
+    var NDFD = new WMSLayer({
+        url: "https://digital.weather.gov/wms.php?",
+        id: "NDFD",
+        title: 'Digital Weather Forest',
+        version: '1.1.1',
+        imageFormat: 'image/png',
+        sublayers: [{
+            name: 'ndfd.conus.maxt',
+            title: 'maxt',
+        }]
+    });
     map = new Map({
         basemap: "topo",
 //        ground: "world-elevation",
-        layers: [worldImagery, USFSgroup, FIREgroup, NWSgroup, CamGroup]
+        layers: [worldImagery, USFSgroup, FIREgroup, NWSgroup, CamGroup, NDFD]
     });
     view = new MapView({
         container: "map",  // Reference to the DOM node that will contain the view
@@ -624,6 +638,207 @@ require([
     });
 
     /************************************************
+    *               Download Data                   *
+    ************************************************/
+
+    getStations = function() {
+        // fire cameras also available here:
+        // http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1
+        var urlBase = "https://firemap.sdsc.edu:5443/stations?";
+        var extent =  'selection=boundingBox&minLat=38.373333&minLon=-121.0145&maxLat=39.3655&maxLon=-119.7843';
+        var observe = '&observable=temperature&observable=wind_speed&all=true';
+        var url = urlBase + extent + observe;
+        $.ajax({
+            url: FireCam_url,
+            cache: false,
+            dataType: 'JSONP',
+            jsonpCallback: 'callback',
+            type: 'GET',
+            success: function(data){ // filter out all non-camera sites
+                data.features = data.features.filter(function(i){
+                    return i.properties.hasOwnProperty('latest-images');
+                });
+                // set the azimuth for the compass array
+                for (var i in data.features){
+                    if (SelectedCams.includes(data.features[i].properties.description.id)){
+                        SelectedCams_azimuth[SelectedCams.indexOf(data.features[i].properties.description.id)] = data.features[i].properties.description.az_current;
+                    }
+                }
+            }
+        })
+        .then(function(data) {
+            // parse the data
+            return [createCameras(data.features), 
+                    createCamview(data.features)];
+        })
+        .then(function([r1, r2]) {
+            // create the layers
+            createLayer(r2, cameraFields.slice(0, 3), camviewRenderer, 'polygon', 'Fire Camera View', 'camview');
+            createLayer(r1, cameraFields, cameraRenderer, 'point', 'Fire Camera', 'camera');
+        })
+    };
+    function createLayer(graphics, fields, renderer, geom, title, id) {
+        var layer = new FeatureLayer({
+            title: title,
+            id: id,
+            source: graphics, // autocast as an array of esri/Graphic
+            // create an instance of esri/layers/support/Field for each field object
+            fields: fields, // This is required when creating a layer from Graphics
+            objectIdField: "ObjectID", // This must be defined when creating a layer from Graphics
+            renderer: renderer, // set the visualization on the layer
+            spatialReference: {
+                wkid: 4326
+            },
+            geometryType: geom, // Must be set when creating a layer from Graphics
+            //popupTemplate: pTemplate,
+            definitionExpression: id === 'camview' ? "id IN ({})".format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'")) : ""
+        });
+        if (map.findLayerById(id) === undefined){
+            switch (id){
+                case 'camera':
+                    FireCams = layer;
+                    break;
+                case 'camview':
+                    FireViews =layer ;
+                    break;
+            }
+            //map.add(layer)
+            CamGroup.add(layer)
+        } else {
+            switch (id){
+                case 'camera':
+                    FireCams.applyEdits({updateFeatures: graphics});
+                    break;
+                case 'camview':
+                    FireViews.applyEdits({updateFeatures: graphics});
+                    break;
+            }
+        }
+        
+    }
+
+    /************************************************
+    *              Fire Camera Points               *
+    ************************************************/
+    var cameraFields = [
+        {name: "ObjectID", alias: "ObjectID", type: "oid"},
+        {name: "name", alias: "name", type: "string"},
+        {name: "id", alias: "id", type: "string"},
+        {name: "attribution", alias: "attribution", type: "string"},
+        {name: "azimuth", alias: "azimuth", type: "double"},
+        {name: "tilt", alias: "tilt", type: "double" },
+        {name: "zoom", alias: "zoom", type: "double" },
+        {name: "fov", alias: "fov", type: "double"},
+    ];
+    var cameraRenderer = {
+        type: "simple", // autocasts as new SimpleRenderer()
+        symbol: {
+            type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+            path: "M14.5,29 23.5,0 14.5,9 5.5,0z",
+            angle: 180,
+            size: 12,
+            color: [211, 255, 0, 0],
+            outline: {
+                width: 1,
+                color: "#FF0055",
+                style: "solid"
+            },
+            xoffset: '3px',
+            yoffset: '-4px',
+        },
+        visualVariables: [{
+            type: "rotation",
+            field: "azimuth",
+            rotationType: "geographic"
+        }]
+    };
+
+    function createCameras(data) {
+        // Create an array of Graphics from each feature
+        var camGraphic = [];
+        var i = 0;
+        data.forEach(function(feature) {
+            var g = {
+                geometry: new Point({
+                    x: parseFloat(feature.geometry.coordinates[0]),
+                    y: parseFloat(feature.geometry.coordinates[1])
+                }),
+                // select only the attributes you care about
+                attributes: {
+                    ObjectID: i,
+                    name: feature.properties.description.name,
+                    id: feature.properties.description.id.toString(),
+                    attribution: feature.properties.description.owner,
+                    azimuth: isNaN(parseFloat(feature.properties.description.az_current)) ? 0: parseFloat(feature.properties.description.az_current),
+                    tilt: isNaN(parseFloat(feature.properties.description.tilt_current)) ? 0: parseFloat(feature.properties.description.tilt_current),
+                    zoom: isNaN(parseFloat(feature.properties.description.zoom_current)) ? 0: parseFloat(feature.properties.description.zoom_current),
+                    fov: isNaN(parseFloat(feature.properties.description.fov)) ? 0: parseFloat(feature.properties.description.fov),
+                }
+            };
+            if (feature.properties.description.fov_rt === undefined){
+                camGraphic.push(g)
+            } else {
+                camGraphic.unshift(g)
+            }
+            i++;
+        });
+        return camGraphic;
+    }
+    /************************************************
+    *              Fire Camera Views                *
+    ************************************************/
+    var camviewRenderer = {
+        type: "simple", 
+        symbol: {
+            style: 'solid',
+            type: 'simple-fill',
+            color: [119, 136, 153, 0.25],
+            outline: {
+                width: 1,
+                color: [186, 195, 203, 0.25],
+                style: "solid"
+            }
+        }
+    };
+    function createCamview(data) {
+        // Create an array of Graphics from each feature
+        var camviewGraphic = [];
+        var i = 0;
+        data.forEach(function(feature) {
+            if (!feature.properties.description.hasOwnProperty('fov_rt')){return;}
+            camviewGraphic.push({
+                geometry: new Polygon({
+                    type: 'polygon',
+                    rings: [[
+                        [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
+                        [parseFloat(feature.properties.description.fov_rt[0]), parseFloat(feature.properties.description.fov_rt[1])],
+                        [parseFloat(feature.properties.description.fov_lft[0]), parseFloat(feature.properties.description.fov_lft[1])],
+                        [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
+                    ]]
+                }),
+                // select only the attributes you care about
+                attributes: {
+                    ObjectID: i,
+                    name: feature.properties.description.name,
+                    id: feature.properties.description.id.toString(),
+                }
+            });
+            i++;
+        });
+        return camviewGraphic;
+    }
+    function drawCameraView(feature){
+        if (SelectedCams.includes(feature.attributes.id)) {
+            SelectedCams.splice(SelectedCams.indexOf(feature.attributes.id), 1);
+            SelectedCams_azimuth.splice(SelectedCams.indexOf(feature.attributes.id), 1);
+            FireViews.definitionExpression = 'id IN ({})'.format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'"));
+        } else {
+            SelectedCams.push(feature.attributes.id);
+            SelectedCams_azimuth.push(feature.attributes.az_current);
+            setCameraDiv(feature.attributes.id);
+            FireViews.definitionExpression = 'id IN ({})'.format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'"));
+        }
+    }    /************************************************
     *               Satellite Data                   *
     ************************************************/
     $(function() {
@@ -633,11 +848,14 @@ require([
 
         // Selected day to show on the map
         var day = new Date(today.getTime());
+        
+        // Satellite from which to get imagery
+        var satelliteName = 'Terra';
 
         // When the day is changed, cache previous layers. This allows already
         // loaded tiles to be used when revisiting a day. Since this is a
         // simple example, layers never "expire" from the cache.
-        var cache = {};
+        var cache = {Terra:{}, Aqua:{}};
 
         // GIBS needs the day as a string parameter in the form of YYYY-MM-DD.
         // Date.toISOString returns YYYY-MM-DDTHH:MM:SSZ. Split at the "T" and
@@ -650,7 +868,7 @@ require([
             // Using the day as the cache key, see if the layer is already
             // in the cache.
             var key = dayParameter();
-            var layer = cache[key];
+            var layer = cache[satelliteName][key];
 
             // If not, create a new layer and add it to the cache.
             if ( !layer ) {
@@ -664,11 +882,11 @@ require([
             map.add(layer, 0);
 
             // Update the day label
-            $("#day-label").html("MODIS Imagery Date: {}".format(dayParameter()));
+            $("#day-label").html("Image: {}".format(dayParameter()));
         };
 
         var create = function(vis) {
-            var url = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{}/GoogleMapsCompatible_Level9/{level}/{row}/{col}.jpg".format(dayParameter());
+            var url = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_{}_CorrectedReflectance_TrueColor/default/{}/GoogleMapsCompatible_Level9/{level}/{row}/{col}.jpg".format(satelliteName, dayParameter());
             //var url = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_Bands721/default/{}/GoogleMapsCompatible_Level9/{level}/{row}/{col}.jpg".format(dayParameter());
             var satellite = new WebTileLayer({
                 // https://wiki.earthdata.nasa.gov/display/GIBS/GIBS+API+for+Developers
@@ -705,6 +923,19 @@ require([
                 update(true);
             }
         });
+        $("#satellite-name").click(function(){
+            switch(this.innerHTML){
+                case 'Terra':
+                    this.innerHTML = 'Aqua';
+                    satelliteName = 'Aqua';
+                    break
+                case 'Aqua':
+                    this.innerHTML = 'Terra';
+                    satelliteName = 'Terra';
+                    break
+            }
+            update(true)
+        });
     });
     /************************************************
     *                Click Events                   *
@@ -713,21 +944,29 @@ require([
     view.on("click", function(event){
         view.hitTest(event)
             .then(function(r){
-                if (r.results[0].graphic.layer.id === 'camera') {
+                var l;
+                for (l=0; l < r.results.length; l++){
+                    // don't register clicks on the camera views
+                    if (r.results[l].graphic.layer.id !== 'camview'){
+                        break
+                    }
+                }
+                if (r.results[l].graphic.layer.id === 'camera') {
                     event.stopPropagation()
-                    drawCameraView(r.results[0].graphic);
+                    drawCameraView(r.results[l].graphic);
                     console.log(SelectedCams)
-                } else if (r.results[0].graphic.layer.id === 'FireZone'){
+                } else if (r.results[l].graphic.layer.id === 'FireZone'){
                     // Fire Weather Zones
-                    var office = r.results[0].graphic.attributes.CWA,
-                        zone = r.results[0].graphic.attributes.ZONE,
-                        state_zone = r.results[0].graphic.attributes.STATE_ZONE,
+                    var office = r.results[l].graphic.attributes.CWA,
+                        zone = r.results[l].graphic.attributes.ZONE,
+                        state_zone = r.results[l].graphic.attributes.STATE_ZONE,
                         office_url = 'https://api.weather.gov/products/types/FWF/locations/' + office;
                     FWFfeature.graphic.popupTemplate.content = 'Looking up forecast for {}. Please wait...'.format(state_zone);
                     // Query the office for the forecast url
                     $.get(office_url)
                     .then(function(response){
                         var forecast_url = response["@graph"][0]["@id"];
+                        console.log(forecast_url)
                         // Get the forecast
                         $.get(forecast_url)
                             .then(function(forecastData) {
@@ -800,6 +1039,7 @@ require([
     /************************************************
     *        Load the cameras and widgets           *
     ************************************************/
+    //getStations()
     view.when(function() {
         // LayerList widget
         var layerList = new LayerList({
@@ -1015,206 +1255,4 @@ require([
             else {view.ui.remove(FWFfeature);}
         });
     });
-    /************************************************
-    *               Download Data                   *
-    ************************************************/
-
-    getStations = function() {
-        // fire cameras also available here:
-        // http://firecams.seismo.unr.edu/firecams/proxy/getptz?get=1
-        var urlBase = "https://firemap.sdsc.edu:5443/stations?";
-        var extent =  'selection=boundingBox&minLat=38.373333&minLon=-121.0145&maxLat=39.3655&maxLon=-119.7843';
-        var observe = '&observable=temperature&observable=wind_speed&all=true';
-        var url = urlBase + extent + observe;
-        $.ajax({
-            url: FireCam_url,
-            cache: false,
-            dataType: 'JSONP',
-            jsonpCallback: 'callback',
-            type: 'GET',
-            success: function(data){ // filter out all non-camera sites
-                data.features = data.features.filter(function(i){
-                    return i.properties.hasOwnProperty('latest-images');
-                });
-                // set the azimuth for the compass array
-                for (var i in data.features){
-                    if (SelectedCams.includes(data.features[i].properties.description.id)){
-                        SelectedCams_azimuth[SelectedCams.indexOf(data.features[i].properties.description.id)] = data.features[i].properties.description.az_current;
-                    }
-                }
-            }
-        })
-        .then(function(data) {
-            // parse the data
-            return [createCameras(data.features), 
-                    createCamview(data.features)];
-        })
-        .then(function([r1, r2]) {
-            // create the layers
-            createLayer(r2, cameraFields.slice(0, 3), camviewRenderer, 'polygon', 'Fire Camera View', 'camview');
-            createLayer(r1, cameraFields, cameraRenderer, 'point', 'Fire Camera', 'camera');
-        })
-    };
-    function createLayer(graphics, fields, renderer, geom, title, id) {
-        var layer = new FeatureLayer({
-            title: title,
-            id: id,
-            source: graphics, // autocast as an array of esri/Graphic
-            // create an instance of esri/layers/support/Field for each field object
-            fields: fields, // This is required when creating a layer from Graphics
-            objectIdField: "ObjectID", // This must be defined when creating a layer from Graphics
-            renderer: renderer, // set the visualization on the layer
-            spatialReference: {
-                wkid: 4326
-            },
-            geometryType: geom, // Must be set when creating a layer from Graphics
-            //popupTemplate: pTemplate,
-            definitionExpression: id === 'camview' ? "id IN ({})".format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'")) : ""
-        });
-        if (map.findLayerById(id) === undefined){
-            switch (id){
-                case 'camera':
-                    FireCams = layer;
-                    break;
-                case 'camview':
-                    FireViews =layer ;
-                    break;
-            }
-            //map.add(layer)
-            CamGroup.add(layer)
-        } else {
-            switch (id){
-                case 'camera':
-                    FireCams.applyEdits({updateFeatures: graphics});
-                    break;
-                case 'camview':
-                    FireViews.applyEdits({updateFeatures: graphics});
-                    break;
-            }
-        }
-        
-    }
-
-    /************************************************
-    *              Fire Camera Points               *
-    ************************************************/
-    var cameraFields = [
-        {name: "ObjectID", alias: "ObjectID", type: "oid"},
-        {name: "name", alias: "name", type: "string"},
-        {name: "id", alias: "id", type: "string"},
-        {name: "attribution", alias: "attribution", type: "string"},
-        {name: "azimuth", alias: "azimuth", type: "double"},
-        {name: "tilt", alias: "tilt", type: "double" },
-        {name: "zoom", alias: "zoom", type: "double" },
-        {name: "fov", alias: "fov", type: "double"},
-    ];
-    var cameraRenderer = {
-        type: "simple", // autocasts as new SimpleRenderer()
-        symbol: {
-            type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
-            path: "M14.5,29 23.5,0 14.5,9 5.5,0z",
-            angle: 180,
-            size: 12,
-            color: [211, 255, 0, 0],
-            outline: {
-                width: 1,
-                color: "#FF0055",
-                style: "solid"
-            },
-            xoffset: '3px',
-            yoffset: '-4px',
-        },
-        visualVariables: [{
-            type: "rotation",
-            field: "azimuth",
-            rotationType: "geographic"
-        }]
-    };
-
-    function createCameras(data) {
-        // Create an array of Graphics from each feature
-        var camGraphic = [];
-        var i = 0;
-        data.forEach(function(feature) {
-            var g = {
-                geometry: new Point({
-                    x: parseFloat(feature.geometry.coordinates[0]),
-                    y: parseFloat(feature.geometry.coordinates[1])
-                }),
-                // select only the attributes you care about
-                attributes: {
-                    ObjectID: i,
-                    name: feature.properties.description.name,
-                    id: feature.properties.description.id.toString(),
-                    attribution: feature.properties.description.owner,
-                    azimuth: isNaN(parseFloat(feature.properties.description.az_current)) ? 0: parseFloat(feature.properties.description.az_current),
-                    tilt: isNaN(parseFloat(feature.properties.description.tilt_current)) ? 0: parseFloat(feature.properties.description.tilt_current),
-                    zoom: isNaN(parseFloat(feature.properties.description.zoom_current)) ? 0: parseFloat(feature.properties.description.zoom_current),
-                    fov: isNaN(parseFloat(feature.properties.description.fov)) ? 0: parseFloat(feature.properties.description.fov),
-                }
-            };
-            if (feature.properties.description.fov_rt === undefined){
-                camGraphic.push(g)
-            } else {
-                camGraphic.unshift(g)
-            }
-            i++;
-        });
-        return camGraphic;
-    }
-    /************************************************
-    *              Fire Camera Views                *
-    ************************************************/
-    var camviewRenderer = {
-        type: "simple", 
-        symbol: {
-            style: 'solid',
-            type: 'simple-fill',
-            color: [119, 136, 153, 0.25],
-            outline: {
-                width: 1,
-                color: [186, 195, 203, 0.25],
-                style: "solid"
-            }
-        }
-    };
-    function createCamview(data) {
-        // Create an array of Graphics from each feature
-        var camviewGraphic = [];
-        var i = 0;
-        data.forEach(function(feature) {
-            if (!feature.properties.description.hasOwnProperty('fov_rt')){return;}
-            camviewGraphic.push({
-                geometry: new Polygon({
-                    type: 'polygon',
-                    rings: [[
-                        [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
-                        [parseFloat(feature.properties.description.fov_rt[0]), parseFloat(feature.properties.description.fov_rt[1])],
-                        [parseFloat(feature.properties.description.fov_lft[0]), parseFloat(feature.properties.description.fov_lft[1])],
-                        [parseFloat(feature.geometry.coordinates[0]), parseFloat(feature.geometry.coordinates[1])],
-                    ]]
-                }),
-                // select only the attributes you care about
-                attributes: {
-                    ObjectID: i,
-                    name: feature.properties.description.name,
-                    id: feature.properties.description.id.toString(),
-                }
-            });
-            i++;
-        });
-        return camviewGraphic;
-    }
-    function drawCameraView(feature){
-        if (SelectedCams.includes(feature.attributes.id)) {
-            SelectedCams.splice(SelectedCams.indexOf(feature.attributes.id), 1);
-            SelectedCams_azimuth.splice(SelectedCams.indexOf(feature.attributes.id), 1);
-            FireViews.definitionExpression = 'id IN ({})'.format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'"));
-        } else {
-            SelectedCams.push(feature.attributes.id);
-            SelectedCams_azimuth.push(feature.attributes.az_current);
-            setCameraDiv(feature.attributes.id);
-            FireViews.definitionExpression = 'id IN ({})'.format(JSON.stringify(SelectedCams).replace(/\[|\]/g, '').replace(/\"/g, "'"));
-        }
-    }
 });
