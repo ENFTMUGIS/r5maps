@@ -6,7 +6,7 @@ String.prototype.format = function () {
 };
 var map, view, FireCams, FireViews, FWFfeature,
     //SelectedCams = getFireDashCookie(),
-    SelectedCams = ['Axis-Leek', 'Axis-BaldCA', 'Axis-BigHill'],
+    SelectedCams = ['Axis-CoonHollow', 'Axis-Sierra', 'Axis-RedCorral'],
     SelectedCams_azimuth = [0, 0, 0];
     generator = CameraGenerator(),
     USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
@@ -242,7 +242,7 @@ require([
         title: 'NOAA RADAR',
         maxScale: 80000,
         opacity: 0.7,
-        visible: true,
+        visible: false,
         sublayers: [
             {
                 id: 3,
@@ -433,11 +433,31 @@ require([
         listMode: 'hide-children',
         minScale: 400000,
         sublayers: [
-            {				id: 6,				visible: true,				popupEnabled: true,				popupTemplate: road_template
-            },{				id: 5,				visible: true,				popupEnabled: true,				popupTemplate: road_template
-            },{				id: 4,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
-            },{				id: 3,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
-            },{				id: 2,				visible: true,				popupEnabled: true,				popupTemplate: trail_template
+            {
+				id: 6,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: road_template
+            },{
+				id: 5,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: road_template
+            },{
+				id: 4,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
+            },{
+				id: 3,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
+            },{
+				id: 2,
+				visible: true,
+				popupEnabled: true,
+				popupTemplate: trail_template
             }
         ]
     });
