@@ -627,6 +627,9 @@
         // Get the number of gaps to fill in hours
         if (durationStr.indexOf("D") == -1){
             var hours = parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
+        } else if (durationStr.indexOf("H") == -1){
+            var days = parseInt(durationStr.slice(durationStr.indexOf("P")+1, durationStr.indexOf("D")));
+            var hours = days * 24;
         } else {
             var days = parseInt(durationStr.slice(durationStr.indexOf("P")+1, durationStr.indexOf("D")));
             var hours = days * 24 + parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
