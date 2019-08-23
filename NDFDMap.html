@@ -131,19 +131,19 @@
             title: 'National Digital Forecast Database',
             opacity: 0.6,
             sublayers: [
-                {
+                /*{
 		    		id: 11,
-                    title: "Daily Min Air Temperature (\xB0 F)",
+                    title: "Daily Min Temperature (\xB0 F)",
 		    		visible: false,
                     variableName: 'minTemperature',
                     englishConvert: function(C) {return Math.round(C * (9/5) + 32)}
                 },{
 		    		id: 7,
-                    title: "Daily Max Air Temperature (\xB0 F)",
+                    title: "Daily Max Temperature (\xB0 F)",
 		    		visible: false,
                     variableName: 'maxTemperature',
                     englishConvert: function(C) {return Math.round(C * (9/5) + 32)}
-                },{
+                },*/{
 		    		id: 27,
                     title: "Total Sky Cover (%)",
 		    		visible: false,
@@ -491,11 +491,12 @@
             // Process the data
             var dataArray = [];
             for (var i=0; i<properties[NDFDCurrentLayerInfo.variableName].values.length; i++) {
-                var date = Date.parse(properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.slice(0, properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.indexOf("/")));
+                /*var date = Date.parse(properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.slice(0, properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.indexOf("/")));
                 if (date >= timeSlider.fullTimeExtent.start && date <= timeSlider.fullTimeExtent.end){
                     var value = NDFDCurrentLayerInfo.englishConvert(properties[NDFDCurrentLayerInfo.variableName].values[i].value)
                     dataArray.push({t:date, y:value})
-                }
+                }*/
+                dataArray.push(...forecastDuration(properties[NDFDCurrentLayerInfo.variableName].values[i]))
             };
             // Plot the forecast
             plot.graphic.popupTemplate.content = setContentInfo(dataArray, NDFDCurrentLayerInfo.title)
@@ -542,8 +543,8 @@
                     scales: {
                         xAxes: [{
                             type: 'time',
-                            min: timeSlider.fullTimeExtent.start,
-                            max: timeSlider.fullTimeExtent.end,
+                            min: NDFDCurrentLayerInfo.timeStops[0],
+                            max: NDFDCurrentLayerInfo.timeStops[NDFDCurrentLayerInfo.timeStops.length-1],
                             distribution: 'linear',
                             time: {
                                 unit: 'day',
@@ -614,6 +615,38 @@
             var previousParamDate = arr[i]
         }
         return i == 0 ? 0 : i-1
+    }
+    function forecastDuration(item) {
+        // Pushes more values to the array if the reading has a duration > 1hr
+        var validTimeStr = item.validTime;
+        var value = NDFDCurrentLayerInfo.englishConvert(item.value);
+        var date = Date.parse(validTimeStr.split("/")[0]);
+        var durationStr = validTimeStr.split("/")[1];
+        // Fill in the duration gaps
+        var gapArray = [];
+        // Get the number of gaps to fill in hours
+        if (durationStr.indexOf("D") == -1){
+            var hours = parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
+        } else {
+            var days = parseInt(durationStr.slice(durationStr.indexOf("P")+1, durationStr.indexOf("D")));
+            var hours = days * 24 + parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
+        }
+        // fill the gap array
+        for (var i=0; hours > 0; i++) {
+        // Return nothing if the date is outside of the timeslider stops
+            if (date + (i*60*60*1000) < timeSlider.fullTimeExtent.start) {
+                // dates before the timeslider start
+                hours--
+                continue
+            } else if (date + (i*60*60*1000) > timeSlider.fullTimeExtent.end) {
+                // dates after the timeslider end
+                break
+            } else {
+                gapArray.push({t: date + (i*60*60*1000), y:value})
+                hours--
+            }
+        }
+        return gapArray
     }
 
   </script>
