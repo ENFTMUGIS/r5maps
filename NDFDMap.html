@@ -197,6 +197,9 @@
         
         
         NDFDLayer.sublayers.forEach(function(sub, i) {
+            // Set the timestops for each layer
+            returnTimeStops(sub)
+            // Watch for visibility changes
             sub.watch("visible", function(newValue, oldValue, property, sublayer) {
                 // Only trigger event if turning on a layer
                 if (newValue == false) {return}
@@ -206,9 +209,9 @@
                         s.visible = false
                     } else {
                         // Reset the time slider with time stops from the new layer
-                        NDFDCurrentLayerInfo = sublayer;
-                        returnTimeStops(sublayer.id);
-                        if (clickEvent) {plotForecast(NDFDMapPointForecast)};
+                        NDFDCurrentLayerInfo = s;
+                        setTimeSliderStops(s);
+                        if (NDFDMapPointForecast) {plotForecast(NDFDMapPointForecast)};
                     }
                 })
             });
@@ -423,7 +426,7 @@
                 graphic: {
                     popupTemplate: {
                         title: null,
-                        content: 'Click anywhere on the map to plot time series for the selected weather parameter'//setContentInfo()  
+                        content: 'Click anywhere on the map to plot time series for the selected weather parameter'
                     }
                 }
             })
@@ -446,7 +449,7 @@
         }
         function plotForecast(properties) {
             NDFDMapPointForecast = properties;
-            
+            // Show plus sign at location of click
             var clickPoint = new Graphic({
                 geometry: {
                     type: 'point',
@@ -485,7 +488,7 @@
             });
             view.graphics = [];
             view.graphics.add(clickPoint);
-            
+            // Process the data
             var dataArray = [];
             for (var i=0; i<properties[NDFDCurrentLayerInfo.variableName].values.length; i++) {
                 var date = Date.parse(properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.slice(0, properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.indexOf("/")));
@@ -576,21 +579,27 @@
             return canvas
         }
     });
-    function returnTimeStops(layerId) {
-        var timeStopUrl = "https://nowcoast.noaa.gov/layerinfo?request=timestops&service=forecast_meteoceanhydro_sfc_ndfd_time&layers="+ layerId + "&padded=false&format=json"
+    function returnTimeStops(sublayer) {
+        var timeStopUrl = "https://nowcoast.noaa.gov/layerinfo?request=timestops&service=forecast_meteoceanhydro_sfc_ndfd_time&layers="+ sublayer.id + "&padded=false&format=json"
         $.getJSON(timeStopUrl)
         .then(function(returnUpdates) {
-            timeSlider.fullTimeExtent = {
-                start: returnUpdates.layers[0].timeStops[0],
-                end: returnUpdates.layers[0].timeStops[returnUpdates.layers[0].timeStops.length - 1]
-            };
-            timeSlider.stops = {
-                dates: returnUpdates.layers[0].timeStops.map(function(d) {return new Date(d)})
-            };
-            if (!timeSlider.values) {
-                timeSlider.values = [new Date(returnUpdates.layers[0].timeStops[currentTimeFromArray(returnUpdates.layers[0].timeStops)])]
-            }
+            var timeStops = returnUpdates.layers[0].timeStops
+            // Set the time stops for the time slider
+            //setTimeSliderStops(timeStops)
+            sublayer.timeStops = timeStops
         })
+    }
+    function setTimeSliderStops(sublayer) {
+        timeSlider.fullTimeExtent = {
+            start: sublayer.timeStops[0],
+            end: sublayer.timeStops[sublayer.timeStops.length - 1]
+        };
+        timeSlider.stops = {
+            dates: sublayer.timeStops.map(function(d) {return new Date(d)})
+        };
+        if (!timeSlider.values) {
+            timeSlider.values = [new Date(sublayer.timeStops[currentTimeFromArray(sublayer.timeStops)])]
+        }
     }
     function currentTimeFromArray(arr) {
         // Search through the forecasts to find the right hour
