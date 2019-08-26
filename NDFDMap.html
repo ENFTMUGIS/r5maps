@@ -160,19 +160,19 @@
                     title: "6-Hour Quantitative Precipitation Amount (inches)",
 		    		visible: false,
                     variableName: 'quantitativePrecipitation',
-                    englishConvert: function(mm) {return Math.round(mm * 0.0393701)}
+                    englishConvert: function(mm) {return parseFloat((mm * 0.0393701).toFixed(2))}
                 },{
 		    		id: 51,
                     title: "Wind Gust (knots)",
 		    		visible: false,
                     variableName: 'windGust',
-                    englishConvert: function(mps) {return Math.round(mps * 1.94384)}
+                    englishConvert: function(mps) {return parseFloat((mps * 1.94384).toFixed(1))}
                 },{
 		    		id: 47,
                     title: "Wind Speed (knots)",
 		    		visible: false,
                     variableName: 'windSpeed',
-                    englishConvert: function(mps) {return Math.round(mps * 1.94384)}
+                    englishConvert: function(mps) {return parseFloat((mps * 1.94384).toFixed(1))}
                 },{
 		    		id: 35,
                     title: "Dew Point (\xB0 F)",
@@ -282,6 +282,7 @@
             title: 'Roads and Trails',
             listMode: 'hide-children',
             minScale: 400000,
+            visible: false,
             sublayers: [
                 {
                     id: 6,
@@ -491,30 +492,39 @@
             // Process the data
             var dataArray = [];
             for (var i=0; i<properties[NDFDCurrentLayerInfo.variableName].values.length; i++) {
-                /*var date = Date.parse(properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.slice(0, properties[NDFDCurrentLayerInfo.variableName].values[i].validTime.indexOf("/")));
-                if (date >= timeSlider.fullTimeExtent.start && date <= timeSlider.fullTimeExtent.end){
-                    var value = NDFDCurrentLayerInfo.englishConvert(properties[NDFDCurrentLayerInfo.variableName].values[i].value)
-                    dataArray.push({t:date, y:value})
-                }*/
                 dataArray.push(...forecastDuration(properties[NDFDCurrentLayerInfo.variableName].values[i]))
             };
+            // Add LAL if viewing probabilityOfPrecipitation
+            if (NDFDCurrentLayerInfo.variableName === "probabilityOfPrecipitation") {
+                var LALarray = [];
+                for (var i=0; i<properties.lightningActivityLevel.values.length; i++) {
+                    LALarray.push(...forecastDuration(properties.lightningActivityLevel.values[i]).filter(i => i.y > 1))
+                };
+                var datasets = [{
+                        label: NDFDCurrentLayerInfo.title,
+                        data: dataArray,
+                        yAxisID: 'Primary',
+                        fill: false
+                    },{
+                        label: 'LAL',
+                        data: LALarray,
+                        borderColor: 'red',
+                        backgroundColor: 'rgba(0,0,0,0)',
+                        yAxisID: 'Primary',
+                        fill: false
+                    }]
+            } else {
+                var datasets = [{
+                        label: NDFDCurrentLayerInfo.title,
+                        data: dataArray,
+                        yAxisID: 'Primary',
+                        fill: false
+                    }]
+            }
             // Plot the forecast
-            plot.graphic.popupTemplate.content = setContentInfo(dataArray, NDFDCurrentLayerInfo.title)
-            // Open popup with proper info
-            /*view.popup.open({
-                title: 'Relative Humidity  {}%'.format(properties.relativeHumidity.values[currentIndex].value),
-                content:  'Elevation: {} ft'.format(Math.round(properties.elevation.value * 3.28084)),
-                location: event.mapPoint,
-                actions: [
-                    {id: 'graphical-forecast',
-                    title: 'NWS graphical forecast',
-                    image: "https://www.weather.gov/images/bmx/images/nwslogo.gif",
-                    lat: lat,
-                    lon: lon}
-                ]
-            });*/
+            plot.graphic.popupTemplate.content = setContentInfo(datasets, NDFDCurrentLayerInfo.title)
         }
-        function setContentInfo(dataArray, variable) {
+        function setContentInfo(datasets) {
             var canvas = document.createElement('canvas');
             canvas.id = "myChart";
             canvas.width = 800;
@@ -523,11 +533,7 @@
             var config = {
                 type: 'line',
                 data: {
-                    datasets: [{
-                        label: variable,
-                        data: dataArray,
-                        fill: false
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -553,10 +559,6 @@
                                 },
                                 stepSize: 1
                             },
-                            //ticks: {
-                            //    source: 'auto',
-                            //    autoSkip: true,
-                            //},
                             scaleLabel: {
                                 display: false,
                                 labelString: 'Time',
@@ -564,10 +566,23 @@
                             }
                         }],
                         yAxes: [{
+                            id: 'Primary',
                             display: true,
                             scaleLabel: {
                                 display: true,
-                                labelString: variable,
+                                labelString: NDFDCurrentLayerInfo.title,
+                                fontSize: 11
+                            }
+                        },{
+                            id: 'LAL',
+                            display: (datasets.length > 1) ? false : false,
+                            position: 'right',
+                            min: 1,
+                            max: 6,
+                            gridlines: {display: false},
+                            scaleLabel: {
+                                display: true,
+                                labelString: 'LAL',
                                 fontSize: 11
                             }
                         }]
@@ -586,7 +601,6 @@
         .then(function(returnUpdates) {
             var timeStops = returnUpdates.layers[0].timeStops
             // Set the time stops for the time slider
-            //setTimeSliderStops(timeStops)
             sublayer.timeStops = timeStops
         })
     }
@@ -614,7 +628,7 @@
             }
             var previousParamDate = arr[i]
         }
-        return i == 0 ? 0 : i-1
+        return (i == 0) ? 0 : i-1
     }
     function forecastDuration(item) {
         // Pushes more values to the array if the reading has a duration > 1hr
