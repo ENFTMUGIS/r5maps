@@ -1,47 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--<meta charset="utf-8">
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"> -->
-  <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
-  <title>Snow Map</title>
-
-  <style>
+    <!--<meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"> -->
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <title>Snow Map</title>
+  
+    <style>
     html,
     body,
     #viewDiv {
-      padding: 0;
-      margin: 0;
-      height: 100%;
-      width: 100%;
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
     }
-
+    #timeSliderDiv {
+        position: absolute;
+        left: 100px;
+        right: 100px;
+        //left: 50px;
+        //right: 50px;
+        //max-width: 1000px;
+        bottom: 20px;
+        display: none;
+    }
+    #plotDiv{
+        position: absolute;
+        width: auto;
+        min-height: 50px;
+        left: 335px;
+        right: 292px;
+        bottom: 120px;
+        background-color: rgba(255, 255, 255, 0.9);
+        display: none;
+    }
+    #myChart{
+        width: auto;
+        height: auto;
+    }
     .esri-popup .esri-popup-header .esri-title {
-      font-size: 18px;
-      font-weight: bolder;
+        font-size: 18px;
+        font-weight: bolder;
     }
-
     .esri-popup .esri-popup-body .esri-popup-content {
-      font-size: 14px;
+        font-size: 14px;
     }
     .esri-feature {
         font-family: monospace;
         padding: 8px;
         z-index: 1000;
         white-space: pre;
-        max-width: 800px;
+        //max-width: 800px;
         max-height: 300px;
         overflow: auto;
     }
-  </style>
+    </style>
 
-  <link rel="stylesheet" href="https://js.arcgis.com/4.10/esri/css/main.css">
-  <script src="https://js.arcgis.com/4.10/"></script>
-
-  <!-- google ajax CDN -->
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"></link>
-  <script>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.12/esri/css/main.css">
+    <script src="https://js.arcgis.com/4.12/"></script>
+    
+    <!-- google ajax CDN -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css"></link>
+    <script>
+        const options = {
+            // tell Dojo where to load other packages
+            dojoConfig: {
+                async: true,
+            packages: [
+                {
+                    location: 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0-rc.1/Chart.bundle.js',
+                    name: 'Chart'
+                }
+            ]}
+        };
+    </script>
+    <script>
     String.prototype.format = function () {
       var i = 0, args = arguments;
       return this.replace(/{}/g, function () {
@@ -59,7 +94,7 @@
         this.lat = this.convert(coord.latitude) + (coord.latitude > 0 ? ' N' : ' S');
         this.lng = this.convert(coord.longitude) + (coord.longitude > 0 ? ' E' : ' W');
     }
-    var map, view, FireCams, FireViews, FWFfeature,
+    var map, view, timeSlider, NDFDCurrentLayerInfo, NDFDMapPointForecast, changeMode, previousMode,
         USGSTopo_url = 'https://basemap.nationalmap.gov/ArcGIS/rest/services/USGSTopo/MapServer',
         WorldImage_url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer',
         FSTopo_url = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_FSTopo_01/MapServer',
@@ -92,11 +127,15 @@
       "esri/widgets/Expand",
       "esri/widgets/Legend",
       "esri/widgets/Feature",
+      "esri/widgets/LayerList",
+      "esri/widgets/TimeSlider",
       "esri/tasks/IdentifyTask",
-      "esri/tasks/support/IdentifyParameters"
+      "esri/tasks/support/IdentifyParameters",
+      "esri/Graphic",
+      "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0-rc.1/Chart.bundle.js",
     ], function(
       Map, MapView, Basemap, MapImageLayer, FeatureLayer, GroupLayer, Expand, Legend,
-      Feature, IdentifyTask, IdentifyParameters
+      Feature, LayerList, TimeSlider, IdentifyTask, IdentifyParameters, Graphic, Chart
     ) {
 
       var identifyTask, params;
@@ -120,8 +159,30 @@
       // Line Chart!
       // https://developers.arcgis.com/javascript/latest/api-reference/esri-support-ContentElement-Media-LineChart.html
 
+    // URL to the map service where the identify will be performed
+    NDFD_url = "https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/forecast_meteoceanhydro_sfc_ndfd_time/MapServer";
+    //NDFD_url = "https://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/forecast_meteoceanhydro_sfc_ndfd_time/MapServer/43"
+    
+    // Add the map service as a TileLayer for fast rendering
+    // Tile layers are composed of non-interactive images. For that reason we'll
+    // use IdentifyTask to query the service to add interactivity to the app
+    var NDFDLayer = new MapImageLayer({
+        url: NDFD_url,
+        title: 'National Digital Forecast Database',
+        opacity: 0.6,
+        visible: false,
+        sublayers: [
+            {
+                id: 19,
+                title: "6-Hour Quantitative\nSnowfall Amount (inches) ",
+                visible: true,
+                variableName: 'snowfallAmount',
+                englishConvert: function(mm) {return parseFloat((mm * 0.0393701).toFixed(2))}
+            }
+        ]
+    });
     // USFS layers
-    var road_template = {
+        var road_template = {
                     title: '{ID} | {NAME}',
                     content: [{
                         type: "fields",
@@ -285,19 +346,18 @@
         id: "myBasemap"
     });
     
-    var map = new Map({
+    map = new Map({
         basemap: customBasemap,//"terrain",
-        layers: [USFSgroup, snowLayer]
+        layers: [USFSgroup, snowLayer, NDFDLayer]
       });
 
-    var view = new MapView({
+    view = new MapView({
         map: map,
         container: "viewDiv",
         center: [-120.45, 38.85],
-        zoom: 9
     });
 
-      view.when(function() {
+    view.when(function() {
         // Legend widget
         var legend = new Legend({
             container: document.createElement("div"),
@@ -312,35 +372,93 @@
             content: legend.domNode
         });
         view.ui.add(legendExpand, "top-right");
-
+        
         InfoFeature = new Feature({
             view: view,
             container: document.createElement("div"),
             graphic: {
                 popupTemplate: {
-                    content: '<b>Click on the colored snow raster for a popup with snow depth information.</b>' + 
-                    '</br></br><b><a href="https://www.nohrsc.noaa.gov/technology/" target="_blank">About the Data:</a></b></br>The National Operational Hydrologic Remote Sensing Center (NOHRSC) ingests daily ground-based, airborne, and </br>satellite snow observations from all available electronic sources for the coterminous U.S. These data are used along </br>with estimates of snowpack characteristics generated by a physically-based snow model to generate the operational, </br>daily NOAA National Snow Analyses (NSA) for the coterminous U.S. The NOHRSC snow model is an energy-and-mass-</br>balance, spatially-uncoupled, vertically-distributed, multi-layer snow model run operationally at 1-km² spatial resolution </br>and hourly temporal resolution for the nation. Ground-based and remotely-sensed snow observations are assimilated daily </br>into the simulated snow-model state variables. '
+                    content: '<b>Choose the map mode below and click on the colored snow raster for a popup with snowpack/forecast information.</b></br>' + 
+                    '<input type="radio" name="mode" value="current" onclick="changeMode(this);" checked="checked"> Current Snow Depth</br>' +
+                    '<input type="radio" name="mode" value="forecast" onclick="changeMode(this);"> Snowfall Forecast</br>' +
+                    '</br><b><a href="https://www.nohrsc.noaa.gov/technology/" target="_blank">About the Data:</a></b></br>The National Operational Hydrologic Remote Sensing Center (NOHRSC) ingests daily ground-based, airborne, and </br>satellite snow observations from all available electronic sources for the coterminous U.S. These data are used along </br>with estimates of snowpack characteristics generated by a physically-based snow model to generate the operational, </br>daily NOAA National Snow Analyses (NSA) for the coterminous U.S. The NOHRSC snow model is an energy-and-mass-</br>balance, spatially-uncoupled, vertically-distributed, multi-layer snow model run operationally at 1-km² spatial resolution </br>and hourly temporal resolution for the nation. Ground-based and remotely-sensed snow observations are assimilated daily </br>into the simulated snow-model state variables. '
                 }
             }
         });
+        changeMode = function(radio){
+            if (previousMode === radio.value){return}
+            if (radio.value === "forecast"){
+                NDFDLayer.visible = true;
+                snowLayer.visible = false;
+                document.getElementById("timeSliderDiv").style.display = "flex";
+                document.getElementById("plotDiv").style.display = "block";
+                timeSlider.container.visible = true;
+                view.on("click", NDFDQuery);
+            } else {
+                NDFDLayer.visible = false;
+                snowLayer.visible = true;
+                document.getElementById("timeSliderDiv").style.display = "none";
+                document.getElementById("plotDiv").style.display = "none";
+                view.on("click", executeIdentifyTask);
+            }
+            previousMode = radio.value;
+        };
         var InfoExpand = new Expand({
             expandIconClass: "esri-icon-description",  // see https://developers.arcgis.com/javascript/latest/guide/esri-icon-font/
-            expandTooltip: "Info", // optional, defaults to "Expand" for English locale
+            expandTooltip: "Map Info", // optional, defaults to "Expand" for English locale
             view: view,
-            expanded: false,
+            expanded: true,
             content: InfoFeature.domNode
         });
         view.ui.add(InfoExpand, {position:"top-left", index:0});
+        /*// Layer List
+        var layerList = new LayerList({
+            container: document.createElement("div"),
+            view: view,
+            // Expand the NDFD sublayer list
+            listItemCreatedFunction: function(event) {
+                if (event.item.title === "National Digital Forecast Database") {
+                    event.item.open = true;
+                }
+            }
+        });
+        view.ui.add(layerList, "top-left");*/
+        // Time Slider
+        timeSlider = new TimeSlider({
+            container: "timeSliderDiv",
+            view: view,
+            mode: "instant",
+            timeVisible: true,
+        });
+        view.ui.add(timeSlider, "manual");
+        // Set the time stops for the time slider (default to temperature)
+        NDFDLayer.sublayers.forEach(function(sub, i) {
+            // Set the timestops for each layer
+            returnTimeStops(sub)
+            NDFDCurrentLayerInfo = sub;
+            if (NDFDMapPointForecast) {plotForecast(NDFDMapPointForecast)};
+        })
+        // Feature to hold the variable plot
+        plot = new Feature({
+            container: "plotDiv",
+            view: view,
+            graphic: {
+                popupTemplate: {
+                    title: null,
+                    content: 'Click anywhere on the map to plot the snowfall forecast time series'
+                }
+            }
+        })
 
         // Set the view Scale
-        view.scale = 400000
-
+        view.scale = 1000000
+      
         // executeIdentifyTask() is called each time the view is clicked
         view.on("click", executeIdentifyTask);
-
+      
         // Create identify task for the specified map service
         identifyTask = new IdentifyTask(snow_url);
-
+      
         // Set the parameters for the Identify
         params = new IdentifyParameters();
         params.tolerance = 2;
@@ -348,69 +466,273 @@
         params.layerOption = "top";
         params.width = view.width;
         params.height = view.height;
-      });
-
-      // Executes each time the view is clicked
-      function executeIdentifyTask(event) {
+    });
+    // ------------------------------
+    // Identify nohrsc layer
+    //-------------------------------
+    function executeIdentifyTask(event) {
         // Set the geometry to the location of the view click
         params.geometry = event.mapPoint;
         params.mapExtent = view.extent;
         document.getElementById("viewDiv").style.cursor = "wait";
-
+    
         // This function returns a promise that resolves to an array of features
         // A custom popupTemplate is set for each feature based on the layer it
         // originates from
         identifyTask.execute(params).then(function(response) {
-
-          var results = response.results;
-
-          return results.map(function(result) {
-
-            var feature = result.feature;
-            var layerName = result.layerName;
-
-            if (feature.attributes["Class value"] != 12){
-              $.getJSON(USGS_elevationQuery_url.format(event.mapPoint.longitude, event.mapPoint.latitude), 
-                function(data){
-                  var ddm = new toDDM(event.mapPoint)
-                  var elevation = data.USGS_Elevation_Point_Query_Service.Elevation_Query;
-                  feature.popupTemplate = {
-                    title: "Snow Depth",
-                    content: "<b>{Pixel Value} inches</b> <br>Class {Class value} <br>" + 
-                      "Elevation: {} {} <br>{} {}".format(elevation.Elevation.toFixed(), elevation.Units, ddm.lat, ddm.lng)
-                  };
+    
+            var results = response.results;
+        
+            return results.map(function(result) {
+                var feature = result.feature;
+                var layerName = result.layerName;
+        
+                if (feature.attributes["Class value"] != 12){
+                    $.getJSON(USGS_elevationQuery_url.format(event.mapPoint.longitude, event.mapPoint.latitude), 
+                        function(data){
+                            var ddm = new toDDM(event.mapPoint)
+                            var elevation = data.USGS_Elevation_Point_Query_Service.Elevation_Query;
+                            feature.popupTemplate = {
+                              title: "Snow Depth",
+                              content: "<b>{Pixel Value} inches</b> <br>Class {Class value} <br>" + 
+                                "Elevation: {} {} <br>{} {}".format(elevation.Elevation.toFixed(), elevation.Units, ddm.lat, ddm.lng)
+                            };
+                        }
+                    )
+                    feature.attributes.layerName = layerName;
+                    //feature.popupTemplate = { // autocasts as new PopupTemplate()
+                    //  title: "Snow depth",
+                    //  content:  "{Pixel Value} inches <br>Class {Class value}"
+                    //};
+                } else {
+                    return
                 }
-              )
-              feature.attributes.layerName = layerName;
-              //feature.popupTemplate = { // autocasts as new PopupTemplate()
-              //  title: "Snow depth",
-              //  content:  "{Pixel Value} inches <br>Class {Class value}"
-              //};
-            } else {
-              return
-            }
-
-            return feature;
-          });
-        }).then(showPopup); // Send the array of features to showPopup()
-
-        // Shows the results of the Identify in a popup once the promise is resolved
-        function showPopup(response) {
-          if (response[0]) {
-            view.popup.open({
-              features: response,
-              location: event.mapPoint
+                return feature;
             });
-          }
-          document.getElementById("viewDiv").style.cursor = "auto";
+        }).then(showPopup); // Send the array of features to showPopup()
+    
+      // Shows the results of the Identify in a popup once the promise is resolved
+      function showPopup(response) {
+        if (response[0]) {
+          view.popup.open({
+            features: response,
+            location: event.mapPoint
+          });
         }
+        document.getElementById("viewDiv").style.cursor = "auto";
       }
+    }
+    // ------------------------------
+    // Plot widget
+    //-------------------------------
+    function NDFDQuery(event) {
+        var point_url = 'https://api.weather.gov/points/';
+        var lat = event.mapPoint.latitude;
+        var lon = event.mapPoint.longitude;
+        clickEvent = event;
+        // Get the forecast JSON from the NWS API
+        $.getJSON(point_url + lat + ',' + lon
+        ).then(function(pointData) {
+            return $.getJSON(pointData.properties.forecastGridData);
+        }).then(function(forecastData) {
+            console.log(forecastData.properties);
+            return forecastData.properties;
+        }).then(plotForecast);
+    }
+    function plotForecast(properties) {
+        NDFDMapPointForecast = properties;
+        // Show plus sign at location of click
+        var clickPoint = new Graphic({
+            geometry: {
+                type: 'point',
+                longitude: clickEvent.mapPoint.longitude,
+                latitude: clickEvent.mapPoint.latitude
+            },
+            attributes: {
+                Latitude: clickEvent.mapPoint.latitude,
+                Longitude: clickEvent.mapPoint.longitude,
+                Elevation: Math.round(properties.elevation.value * 3.28084)
+            },
+            symbol: {
+                type: "simple-marker",
+                style: "cross",
+                color: "black",
+                outline: {width: "3px"}
+            },
+            popupTemplate: {
+                title: null,
+                content: [{
+                    type: 'fields',
+                    fieldInfos: [
+                        {fieldName: 'Elevation'},
+                        {fieldName: 'Latitude'},
+                        {fieldName: 'Longitude'},
+                    ]
+                }],
+                actions: [
+                    {id: 'graphical-forecast',
+                    title: 'NWS graphical forecast',
+                    image: "https://www.weather.gov/images/bmx/images/nwslogo.gif",
+                    lat: clickEvent.mapPoint.latitude,
+                    lon: clickEvent.mapPoint.longitude}
+                ]
+            }
+        });
+        view.graphics = [];
+        view.graphics.add(clickPoint);
+        // Process the data
+        var dataArray = [];
+        for (var i=0; i<properties[NDFDCurrentLayerInfo.variableName].values.length; i++) {
+            dataArray.push(...forecastDuration(properties[NDFDCurrentLayerInfo.variableName].values[i]))
+        };
+        console.log(dataArray)
+        var datasets = [{
+                label: NDFDCurrentLayerInfo.title,
+                data: dataArray,
+                yAxisID: 'Primary',
+                fill: false,
+                steppedLine: "before",
+            }]
+        // Plot the forecast
+        plot.graphic.popupTemplate.content = setContentInfo(datasets, NDFDCurrentLayerInfo.title)
+    }
+    function setContentInfo(datasets) {
+        var canvas = document.createElement('canvas');
+        canvas.id = "myChart";
+        canvas.width = 800;
+        canvas.height = 100;
+        
+        var config = {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                legend: {display: false},
+                tooltips: {
+                    mode: 'point',
+                    intersect: false,
+                },
+                hover: {
+                    mode: 'nearest',
+                    intersect: true
+                },
+                scales: {
+                    xAxes: [{
+                        type: 'time',
+                        min: NDFDCurrentLayerInfo.timeStops[0],
+                        max: NDFDCurrentLayerInfo.timeStops[NDFDCurrentLayerInfo.timeStops.length-1],
+                        distribution: 'linear',
+                        time: {
+                            unit: 'day',
+                            displayFormats: {
+                                day: 'ddd, MMM D'
+                            },
+                            stepSize: 1
+                        },
+                        scaleLabel: {
+                            display: false,
+                            labelString: 'Time',
+                            fontSize: 0
+                        }
+                    }],
+                    yAxes: [{
+                        id: 'Primary',
+                        display: true,
+                        scaleLabel: {
+                            display: true,
+                            labelString: NDFDCurrentLayerInfo.title,
+                            fontSize: 11
+                        }
+                    }]
+                }
+            }
+        };
+        var chart = new Chart(canvas, config);
+        chart.maintainAspectRatio = false;
+        
+        return canvas
+    }
+    function returnTimeStops(sublayer) {
+        var timeStopUrl = "https://nowcoast.noaa.gov/layerinfo?request=timestops&service=forecast_meteoceanhydro_sfc_ndfd_time&layers="+ sublayer.id + "&padded=false&format=json";
+        $.getJSON(timeStopUrl)
+        .then(function(returnUpdates) {
+            var timeStops = returnUpdates.layers[0].timeStops
+            // Set the time stops for the time slider
+            sublayer.timeStops = timeStops
+            setTimeSliderStops(timeStops);
+        })
+    }
+    function setTimeSliderStops(timeStops) {
+        timeSlider.fullTimeExtent = {
+            start: timeStops[0],
+            end: timeStops[timeStops.length - 1]
+        };
+        timeSlider.stops = {
+            dates: timeStops.map(function(d) {return new Date(d)})
+        };
+        if (!timeSlider.values) {
+            timeSlider.values = [new Date(timeStops[currentTimeFromArray(timeStops)])]
+        }
+    }
+    function currentTimeFromArray(arr) {
+        // Search through the forecasts to find the right hour
+        for (var i=0; i< arr.length; i++) {
+            if (arr[i] > Date.now()) {
+                // If the next date is closer to now, use that one
+                if (arr[i] - Date.now() < Date.now() - previousParamDate) {
+                    continue
+                }
+                break
+            }
+            var previousParamDate = arr[i]
+        }
+        return (i == 0) ? 0 : i-1
+    }
+    function forecastDuration(item) {
+        // Pushes more values to the array if the reading has a duration > 1hr
+        var validTimeStr = item.validTime;
+        var value = NDFDCurrentLayerInfo.englishConvert(item.value);
+        var date = Date.parse(validTimeStr.split("/")[0]);
+        var durationStr = validTimeStr.split("/")[1];
+        // Fill in the duration gaps
+        var gapArray = [];
+        // Get the number of gaps to fill in hours
+        if (durationStr.indexOf("D") == -1){
+            var hours = parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
+        } else if (durationStr.indexOf("H") == -1){
+            var days = parseInt(durationStr.slice(durationStr.indexOf("P")+1, durationStr.indexOf("D")));
+            var hours = days * 24;
+        } else {
+            var days = parseInt(durationStr.slice(durationStr.indexOf("P")+1, durationStr.indexOf("D")));
+            var hours = days * 24 + parseInt(durationStr.slice(durationStr.indexOf("T")+1, durationStr.indexOf("H")));
+        }
+        // fill the gap array
+        for (var i=0; hours > 0; i++) {
+        // Return nothing if the date is outside of the timeslider stops
+            if (date + (i*60*60*1000) < timeSlider.fullTimeExtent.start) {
+                // dates before the timeslider start
+                hours = hours - 6
+                continue
+            } else if (date + (i*60*60*1000) > timeSlider.fullTimeExtent.end) {
+                // dates after the timeslider end
+                break
+            } else {
+                gapArray.push({t: date + (i*60*60*1000), y:value})
+                hours = hours - 6
+            }
+        }
+        return gapArray
+    }
     });
   </script>
 </head>
 
 <body>
-  <div id="viewDiv"></div>
+    <div id="viewDiv"></div>
+    <div id="timeSliderDiv"></div>
+    <div id="plotDiv"></div>
 </body>
 
 </html>
