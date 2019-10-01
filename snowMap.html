@@ -393,13 +393,15 @@
                 document.getElementById("timeSliderDiv").style.display = "flex";
                 document.getElementById("plotDiv").style.display = "block";
                 timeSlider.container.visible = true;
-                view.on("click", NDFDQuery);
+                clickHandle.remove()
+                clickHandle = view.on("click", NDFDQuery);
             } else {
                 NDFDLayer.visible = false;
                 snowLayer.visible = true;
                 document.getElementById("timeSliderDiv").style.display = "none";
                 document.getElementById("plotDiv").style.display = "none";
-                view.on("click", executeIdentifyTask);
+                clickHandle.remove()
+                clickHandle = view.on("click", executeIdentifyTask);
             }
             previousMode = radio.value;
         };
@@ -454,7 +456,7 @@
         view.scale = 1000000
       
         // executeIdentifyTask() is called each time the view is clicked
-        view.on("click", executeIdentifyTask);
+        var clickHandle = view.on("click", executeIdentifyTask);
       
         // Create identify task for the specified map service
         identifyTask = new IdentifyTask(snow_url);
