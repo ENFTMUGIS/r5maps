@@ -173,8 +173,7 @@
                 id: 3,
                 visible: true,
                 title: 'Snow Depth (in)'
-            }
-          ]
+            }]
         });
 
         // USFS layers
@@ -458,7 +457,7 @@
                                 feature.popupTemplate = {
                                     title: "Snow Depth: {}".format(inches2feet(feature.attributes["Pixel Value"])),
                                     content: 
-                                    '<img src="https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/NOHRSC_Snow_Analysis/MapServer/3/images/{}"></img>'.format(legendURL) +
+                                    '<img src="https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/NOHRSC_Snow_Analysis/MapServer/3/images/{}" style="opacity:0.6"></img>'.format(legendURL) +
                                     "  {} inches <br>".format(legendLabel) +
                                     "Elevation: {} {} <br>{} {}".format(elevation.Elevation.toFixed(), elevation.Units, ddm.lat, ddm.lng)
                                 };
